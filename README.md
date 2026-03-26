@@ -1,15 +1,17 @@
 # X Markdown Exporter
 
-一个用于导出 X（Twitter）推文和长文为 Markdown 的 Chrome 扩展。
+![X Markdown Exporter Social Preview](assets/social-preview.png)
 
-它会尽量保留原页面里的图文顺序，并支持三种下载方式：链接引用、内嵌图片、ZIP 打包。当前导出默认附带作者和发布时间，适合做归档、收藏、整理素材和二次写作。
+一个用于导出 X（Twitter）推文、线程和长文为 Markdown 的 Chrome 扩展。
+
+它会尽量保留原页面里的图文顺序，并支持三种下载方式：链接引用、内嵌图片、ZIP 打包。导出默认附带作者和发布时间，适合做归档、收藏、整理素材和后续二次写作。
 
 ## 功能特性
 
 - 支持 X / Twitter 推文详情页导出
 - 支持长文 / Note 页面提取
 - 自动保留正文与图片的原始顺序
-- 支持同作者线程内容连续导出
+- 支持同作者线程连续导出
 - 支持三种导出模式：
   - `link`：Markdown 中保留远程图片链接
   - `embed`：图片压缩后转为 Base64 内嵌到单个 Markdown 文件
@@ -18,27 +20,32 @@
 - 自动优化标题与文件名，跳过开头图片占位内容
 - 所有处理都在本地浏览器完成，不依赖后端服务
 
-## 使用场景
-
-- 归档喜欢的推文或线程
-- 保存 X 长文做本地备份
-- 将内容转成 Markdown 供知识库、博客草稿或 AI 工作流继续处理
-
 ## 安装方式
 
-### 本地加载
+### 方式一：从 GitHub Release 下载
 
-1. 打开 Chrome / Edge 的扩展管理页：
+1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
+2. 下载最新版本里的 `x-markdown-exporter-v1.3.0.zip`
+3. 解压 ZIP 文件
+4. 打开 Chrome / Edge 扩展管理页：
    - Chrome: `chrome://extensions/`
    - Edge: `edge://extensions/`
-2. 打开“开发者模式”
-3. 点击“加载已解压的扩展程序”
-4. 选择本项目目录
+5. 开启“开发者模式”
+6. 点击“加载已解压的扩展程序”
+7. 选择解压后的目录
+
+### 方式二：直接克隆仓库
+
+```bash
+git clone https://github.com/Renn9527/x-markdown-exporter.git
+```
+
+然后同样在扩展管理页中加载仓库目录。
 
 ## 使用方法
 
 1. 打开一条 X 推文详情页，或一篇 X 长文页面
-2. 点击扩展图标
+2. 点击浏览器工具栏中的扩展图标
 3. 选择下载模式
 4. 点击“下载 Markdown”
 
@@ -57,41 +64,41 @@ Markdown 中的图片使用原始 URL。
 图片会压缩后以内嵌方式写入 Markdown。
 
 适合：
-- 想保留单文件
-- 方便直接丢进 Obsidian、Notion 导入流或本地归档
+- 希望保留单文件
+- 方便直接导入 Obsidian、Notion 或本地知识库
 
 ### `zip`
 
-Markdown 和图片分开保存，再一起打成 ZIP。
+Markdown 和图片分开保存，再一起打包成 ZIP。
 
 适合：
-- 完整离线存档
+- 完整离线归档
 - 希望 Markdown 本体保持清爽
 
 ## 项目结构
 
 ```text
 .
-├─ manifest.json        # 扩展配置
-├─ popup.html           # 弹窗界面
-├─ popup.js             # 弹窗逻辑
-├─ content.js           # 页面内容提取与导出核心逻辑
-├─ background.js        # 后台抓取图片资源
-├─ jszip.min.js         # ZIP 打包依赖
-├─ content.css          # 预留样式文件
-└─ icons/               # 扩展图标
+├─ manifest.json
+├─ popup.html
+├─ popup.js
+├─ content.js
+├─ background.js
+├─ jszip.min.js
+├─ content.css
+├─ icons/
+└─ assets/
 ```
 
 ## 技术实现
 
 - `content.js`
   - 识别推文详情页和长文页面
-  - 提取正文、图片、作者、时间、互动信息
-  - 处理线程内容
-  - 生成 Markdown
+  - 提取正文、图片、作者、时间和线程内容
+  - 生成最终 Markdown
 - `background.js`
   - 负责跨域抓取图片
-  - 将图片转成 Base64 供内嵌或 ZIP 模式使用
+  - 将图片转成 Base64，供内嵌或 ZIP 模式使用
 - `popup.js`
   - 检测当前页面是否可导出
   - 切换导出模式并触发下载
@@ -119,6 +126,6 @@ Markdown 和图片分开保存，再一起打成 ZIP。
 3. 点击“重新加载”
 4. 在 X 页面重新测试
 
-## 当前版本
+## License
 
-`v1.3.0`
+[MIT](LICENSE)
