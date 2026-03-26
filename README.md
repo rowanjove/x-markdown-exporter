@@ -8,6 +8,18 @@
 
 X Markdown Exporter is a Chrome extension for exporting X (Twitter) posts, threads, and long-form notes into Markdown.
 
+## Preview
+
+界面与导出示意如下。The images below show the popup flow and an example export result.
+
+### Popup
+
+![Popup Preview](assets/popup-preview.png)
+
+### Export Example
+
+![Export Example](assets/export-example.png)
+
 <a id="chinese"></a>
 
 ## 中文
