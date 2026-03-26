@@ -1,0 +1,139 @@
+const statusEl = document.getElementById('status');
+const downloadBtn = document.getElementById('downloadBtn');
+const progressEl = document.getElementById('progress');
+const progressText = document.getElementById('progressText');
+const resultEl = document.getElementById('result');
+const modeDescEl = document.getElementById('modeDesc');
+const refreshBtn = document.getElementById('refreshBtn');
+
+let currentTabId = null;
+let currentMode = 'embed';
+
+const MODE_DESCS = {
+  link: '图片会保留原始链接，生成的 Markdown 最轻量。',
+  embed: '图片压缩后以内嵌方式写入 Markdown，单文件保存更省心。',
+  zip: 'Markdown 和图片一起打包成 ZIP，适合完整离线归档。',
+};
+
+function setStatus(type, text) {
+  statusEl.className = `status ${type}`;
+  statusEl.querySelector('span').textContent = text;
+}
+
+function showResult(type, text) {
+  resultEl.className = `result ${type}`;
+  resultEl.textContent = text;
+  resultEl.style.display = 'block';
+  setTimeout(() => {
+    resultEl.style.display = 'none';
+  }, 4000);
+}
+
+function updateModeUi(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.mode === mode);
+  });
+  modeDescEl.textContent = MODE_DESCS[mode];
+}
+
+document.querySelectorAll('.mode-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    updateModeUi(btn.dataset.mode);
+    localStorage.setItem('xpd_mode', currentMode);
+  });
+});
+
+const savedMode = localStorage.getItem('xpd_mode');
+if (savedMode && MODE_DESCS[savedMode]) {
+  updateModeUi(savedMode);
+} else {
+  updateModeUi(currentMode);
+}
+
+async function checkCurrentPage() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) {
+      setStatus('no', '无法获取当前标签页');
+      return;
+    }
+
+    currentTabId = tab.id;
+    const url = tab.url || '';
+
+    if (!url.match(/https:\/\/(x\.com|twitter\.com)\/[^/]+\/(status|i\/web\/status)\/\d+/)) {
+      setStatus('no', '请打开 X 推文详情页');
+      downloadBtn.disabled = true;
+      return;
+    }
+
+    try {
+      const response = await chrome.tabs.sendMessage(currentTabId, { type: 'PING' });
+      if (response && response.ok) {
+        setStatus('ok', '可以下载当前内容');
+        downloadBtn.disabled = false;
+      } else {
+        setStatus('no', '页面还没准备好，请刷新后重试');
+      }
+    } catch (error) {
+      setStatus('no', '页面还没准备好，请刷新后重试');
+    }
+  } catch (error) {
+    setStatus('no', `检测失败: ${error.message}`);
+  }
+}
+
+checkCurrentPage();
+
+refreshBtn.addEventListener('click', () => {
+  if (currentTabId) {
+    chrome.tabs.reload(currentTabId);
+  } else {
+    chrome.tabs.reload();
+  }
+  setTimeout(() => window.close(), 100);
+});
+
+downloadBtn.addEventListener('click', async () => {
+  if (!currentTabId) return;
+
+  downloadBtn.disabled = true;
+  downloadBtn.textContent = '处理中...';
+  progressEl.classList.add('show');
+  resultEl.className = 'result';
+  resultEl.style.display = 'none';
+
+  try {
+    progressText.textContent = '正在提取内容...';
+
+    const response = await chrome.tabs.sendMessage(currentTabId, {
+      type: 'EXTRACT_AND_DOWNLOAD',
+      mode: currentMode,
+      options: {
+        includeAuthor: true,
+        includeTime: true,
+        includeStats: false,
+        includeComments: false,
+      },
+    });
+
+    if (response && response.success) {
+      showResult('success', '下载成功');
+    } else {
+      showResult('error', response?.error || '下载失败');
+    }
+  } catch (error) {
+    showResult('error', `下载失败: ${error.message}`);
+  } finally {
+    downloadBtn.disabled = false;
+    downloadBtn.textContent = '下载 Markdown';
+    progressEl.classList.remove('show');
+  }
+});
+
+chrome.runtime.onMessage.addListener((msg) => {
+  if (msg.type === 'XPD_PROGRESS') {
+    progressText.textContent = msg.text;
+  }
+});
