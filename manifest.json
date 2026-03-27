@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "X Markdown Exporter",
-  "version": "1.3.0",
-  "description": "下载 X (Twitter) 推文/文章为 Markdown 文件，并保留图文混排版（支持链接/内嵌/ZIP三种模式）",
+  "version": "1.4.0",
+  "description": "Export X (Twitter) posts and notes to Markdown with a draggable floating panel and link card support.",
   "permissions": [
     "activeTab"
   ],
@@ -21,7 +21,13 @@
         "https://x.com/*",
         "https://twitter.com/*"
       ],
-      "js": ["jszip.min.js", "content.js"],
+      "css": [
+        "content.css"
+      ],
+      "js": [
+        "jszip.min.js",
+        "content.js"
+      ],
       "run_at": "document_idle"
     }
   ],

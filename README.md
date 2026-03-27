@@ -4,17 +4,9 @@
 
 [中文](#chinese) | [English](#english)
 
-一个用于导出 X（Twitter）推文、线程和长文为 Markdown 的 Chrome 扩展。
-
-X Markdown Exporter is a Chrome extension for exporting X (Twitter) posts, threads, and long-form notes into Markdown.
+X Markdown Exporter is a Chrome / Edge extension for exporting X (Twitter) posts, threads, and long-form notes into Markdown.
 
 ## Preview
-
-界面与导出示意如下。The images below show the popup flow and an example export result.
-
-### Popup
-
-![Popup Preview](assets/popup-preview.png)
 
 ### Export Example
 
@@ -26,32 +18,59 @@ X Markdown Exporter is a Chrome extension for exporting X (Twitter) posts, threa
 
 ### 这是什么
 
-它会尽量保留原页面里的图文顺序，并支持三种下载方式：链接引用、内嵌图片、ZIP 打包。导出默认附带作者和发布时间，适合做归档、收藏、整理素材和后续二次写作。
+这是一个把 X / Twitter 推文、线程和 Note 导出成 Markdown 的浏览器扩展。新版默认在页面右侧提供可拖动的悬浮按钮，点开后即可选择导出模式，不需要把插件固定在工具栏里。
 
-### 功能特性
+### 亮点
 
-- 支持 X / Twitter 推文详情页导出
-- 支持长文 / Note 页面提取
-- 自动保留正文与图片的原始顺序
+- 支持 X / Twitter 推文详情页和 Note 页面导出
+- 页面内右侧悬浮按钮，支持横向和纵向拖动，自动记住位置
+- 点击后弹出小面板，直接选择导出模式
+- 保留正文和图片的原始顺序
 - 支持同作者线程连续导出
-- 支持三种导出模式：
-  - `link`：Markdown 中保留远程图片链接
-  - `embed`：图片压缩后转为 Base64 内嵌到单个 Markdown 文件
-  - `zip`：Markdown 和图片一起打包为 ZIP
-- 默认附带作者与发布时间
-- 自动优化标题与文件名，跳过开头图片占位内容
+- 支持外链预览卡提取，导出时会尽量保留链接标题、摘要和域名
+- 支持三种导出模式
+- 默认附带作者和发布时间
 - 所有处理都在本地浏览器完成，不依赖后端服务
 
-### 安装方式
+### 导出模式
 
-#### 方式一：从 GitHub Release 下载
+#### `link`
+
+Markdown 中保留远程图片地址，并尽量把链接卡片转成普通 Markdown 链接。
+
+适合：
+
+- 文件体积最小
+- 在线阅读或二次整理
+
+#### `embed`
+
+图片压缩后以内嵌 Base64 的形式写入单个 Markdown 文件。
+
+适合：
+
+- 想保留单文件
+- 导入 Obsidian、Notion 或本地知识库
+
+#### `zip`
+
+Markdown 和图片分开保存，再打包成 ZIP。
+
+适合：
+
+- 完整离线归档
+- 希望 Markdown 正文更清爽
+
+### 安装
+
+#### 方式一：从 GitHub Releases 下载
 
 1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. 下载最新版本里的 `x-markdown-exporter-v1.3.0.zip`
+2. 下载最新版本里的 `x-markdown-exporter-v1.4.0.zip`
 3. 解压 ZIP 文件
-4. 打开 Chrome / Edge 扩展管理页：
-   - Chrome: `chrome://extensions/`
-   - Edge: `edge://extensions/`
+4. 打开扩展管理页
+   Chrome: `chrome://extensions/`
+   Edge: `edge://extensions/`
 5. 开启“开发者模式”
 6. 点击“加载已解压的扩展程序”
 7. 选择解压后的目录
@@ -62,40 +81,17 @@ X Markdown Exporter is a Chrome extension for exporting X (Twitter) posts, threa
 git clone https://github.com/Renn9527/x-markdown-exporter.git
 ```
 
-然后同样在扩展管理页中加载仓库目录。
+然后同样在浏览器扩展管理页加载仓库目录。
 
 ### 使用方法
 
-1. 打开一条 X 推文详情页，或一篇 X 长文页面
-2. 点击浏览器工具栏中的扩展图标
-3. 选择下载模式
-4. 点击“下载 Markdown”
+1. 打开一条 X 推文详情页或一篇 X Note 页面
+2. 在页面右侧找到悬浮按钮
+3. 如果挡住内容，可以直接拖到更合适的位置
+4. 点开面板后选择导出模式
+5. 点击 `下载 Markdown`
 
-### 导出模式说明
-
-#### `link`
-
-Markdown 中的图片使用原始 URL。
-
-适合：
-- 文件尽量小
-- 不需要离线查看图片
-
-#### `embed`
-
-图片会压缩后以内嵌方式写入 Markdown。
-
-适合：
-- 希望保留单文件
-- 方便直接导入 Obsidian、Notion 或本地知识库
-
-#### `zip`
-
-Markdown 和图片分开保存，再一起打包成 ZIP。
-
-适合：
-- 完整离线归档
-- 希望 Markdown 本体保持清爽
+工具栏里的扩展弹窗仍然保留，作为备用入口。
 
 ### 项目结构
 
@@ -105,48 +101,50 @@ Markdown 和图片分开保存，再一起打包成 ZIP。
 ├─ popup.html
 ├─ popup.js
 ├─ content.js
+├─ content.css
 ├─ background.js
 ├─ jszip.min.js
-├─ content.css
 ├─ icons/
-└─ assets/
+├─ assets/
+└─ dist/
 ```
 
-### 技术实现
+### 技术说明
 
 - `content.js`
-  - 识别推文详情页和长文页面
-  - 提取正文、图片、作者、时间和线程内容
-  - 生成最终 Markdown
+  - 注入右侧悬浮入口和弹出面板
+  - 处理拖动定位、页面状态检查和导出触发
+  - 提取正文、图片、线程和链接卡片内容
+- `content.css`
+  - 定义悬浮按钮、弹层和提示样式
 - `background.js`
   - 负责跨域抓取图片
-  - 将图片转成 Base64，供内嵌或 ZIP 模式使用
+  - 为 `embed` 和 `zip` 模式提供 Base64 数据
 - `popup.js`
-  - 检测当前页面是否可导出
-  - 切换导出模式并触发下载
+  - 保留工具栏备用入口
 
 ### 已知限制
 
-- 需要在推文详情页或长文页面使用，列表流页面不会直接导出
-- X 页面 DOM 结构如果发生明显变化，提取规则可能需要更新
-- 当前主要覆盖文字、图片和线程内容，复杂卡片内容可能存在提取差异
+- 主要面向推文详情页和 Note 页面，时间线首页不会直接导出
+- 如果 X 调整 DOM 结构，提取规则可能需要跟进
+- 大多数外链预览卡可以提取，但极个别复杂卡片仍可能不完整
 
 ### 隐私说明
 
 - 不上传内容到第三方服务器
-- 不依赖账号登录之外的外部服务
-- 图片资源仅通过扩展后台从 X / Twitter 官方资源地址拉取
+- 不依赖除 X / Twitter 资源之外的外部服务
+- 图片仅通过扩展后台从官方资源地址获取
 
-### 开发说明
+### 本地开发
 
-项目目前是纯前端浏览器扩展，无构建步骤。
+项目没有构建步骤。
 
-如需本地修改：
+本地测试：
 
-1. 编辑项目文件
-2. 回到扩展管理页
+1. 修改仓库文件
+2. 打开浏览器扩展管理页
 3. 点击“重新加载”
-4. 在 X 页面重新测试
+4. 回到 X 页面刷新并测试
 
 <a id="english"></a>
 
@@ -154,32 +152,59 @@ Markdown 和图片分开保存，再一起打包成 ZIP。
 
 ### What It Does
 
-X Markdown Exporter preserves the reading order of text and images on X pages and lets you export content in three formats: linked images, embedded images, or a ZIP archive. Author and publish time are included by default, which makes it useful for archiving, collecting references, and reusing content in writing workflows.
+X Markdown Exporter exports X / Twitter posts, threads, and long-form notes into Markdown. The latest UI uses a draggable floating button on the right side of the page, so you can open the export panel directly inside X without pinning the extension in the browser toolbar.
 
-### Features
+### Highlights
 
-- Export X / Twitter post detail pages to Markdown
-- Extract content from long-form notes and article pages
+- Export X / Twitter post detail pages and Note pages
+- Draggable in-page floating launcher with saved position
+- Open a compact export panel directly on the page
 - Preserve the original order of text and images
 - Export same-author thread continuations
-- Support three output modes:
-  - `link`: keep remote image URLs inside Markdown
-  - `embed`: compress images and embed them as Base64 in a single Markdown file
-  - `zip`: package Markdown and images together in a ZIP archive
+- Convert supported link preview cards into Markdown links with title / summary / domain
+- Support `link`, `embed`, and `zip` output modes
 - Include author and publish time by default
-- Generate cleaner titles and filenames by skipping leading image placeholders
-- Run fully in the browser without any backend service
+- Run fully in the browser with no backend service
+
+### Export Modes
+
+#### `link`
+
+Keep remote image URLs in Markdown and preserve supported external preview cards as Markdown links.
+
+Best for:
+
+- the smallest file size
+- online reading or lightweight notes
+
+#### `embed`
+
+Compress images and embed them as Base64 in a single Markdown file.
+
+Best for:
+
+- a single self-contained file
+- importing into Obsidian, Notion, or local knowledge bases
+
+#### `zip`
+
+Store Markdown and images separately, then package them into a ZIP archive.
+
+Best for:
+
+- full offline archiving
+- keeping the Markdown body cleaner
 
 ### Installation
 
 #### Option 1: Download from GitHub Releases
 
 1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. Download `x-markdown-exporter-v1.3.0.zip`
+2. Download `x-markdown-exporter-v1.4.0.zip`
 3. Extract the ZIP file
-4. Open the extensions page in Chrome or Edge:
-   - Chrome: `chrome://extensions/`
-   - Edge: `edge://extensions/`
+4. Open the extensions page
+   Chrome: `chrome://extensions/`
+   Edge: `edge://extensions/`
 5. Enable Developer Mode
 6. Click `Load unpacked`
 7. Select the extracted folder
@@ -194,36 +219,13 @@ Then load the repository folder as an unpacked extension.
 
 ### Usage
 
-1. Open an X post detail page or a long-form note page
-2. Click the extension icon in the browser toolbar
-3. Choose an export mode
-4. Click `Download Markdown`
+1. Open an X post detail page or a Note page
+2. Find the floating launcher on the right side
+3. Drag it away if it overlaps the content
+4. Open the panel and choose an export mode
+5. Click `Download Markdown`
 
-### Export Modes
-
-#### `link`
-
-Images remain as remote URLs inside the Markdown file.
-
-Best for:
-- the smallest possible file size
-- online reading with no offline image requirement
-
-#### `embed`
-
-Images are compressed and embedded directly into the Markdown file.
-
-Best for:
-- a single self-contained file
-- importing into Obsidian, Notion, or local knowledge bases
-
-#### `zip`
-
-Markdown and images are stored separately and packaged into a ZIP file.
-
-Best for:
-- complete offline archiving
-- keeping the Markdown body cleaner
+The toolbar popup is still available as a fallback entry point.
 
 ### Project Structure
 
@@ -233,48 +235,50 @@ Best for:
 ├─ popup.html
 ├─ popup.js
 ├─ content.js
+├─ content.css
 ├─ background.js
 ├─ jszip.min.js
-├─ content.css
 ├─ icons/
-└─ assets/
+├─ assets/
+└─ dist/
 ```
 
 ### Technical Notes
 
 - `content.js`
-  - detects post detail pages and note pages
-  - extracts text, images, author, time, and thread content
-  - builds the final Markdown output
+  - injects the floating launcher and export panel
+  - handles dragging, page state checks, and export actions
+  - extracts text, images, threads, and supported link preview cards
+- `content.css`
+  - styles the floating launcher, panel, and toasts
 - `background.js`
   - fetches cross-origin images
-  - converts images to Base64 for `embed` and `zip` modes
+  - provides Base64 payloads for `embed` and `zip`
 - `popup.js`
-  - checks whether the current page can be exported
-  - switches export modes and triggers downloads
+  - keeps the toolbar popup as a fallback
 
 ### Known Limitations
 
-- The extension is meant for post detail pages and note pages, not the timeline feed itself
-- If X changes its DOM structure significantly, extraction rules may need updates
-- The current extractor focuses on text, images, and thread content; complex cards may vary
+- The extension is designed for post detail pages and Note pages, not the main timeline feed
+- If X changes its DOM structure significantly, the extraction rules may need updates
+- Most preview cards are handled, but a few complex cards may still be incomplete
 
 ### Privacy
 
 - No content is uploaded to third-party servers
-- No external service is required beyond normal X browsing
+- No external backend service is required
 - Images are fetched only from official X / Twitter asset URLs through the extension background worker
 
 ### Development
 
-This project is a plain browser extension with no build step.
+There is no build step.
 
 To test local changes:
 
-1. Edit the project files
-2. Return to the browser extensions page
+1. Edit the repository files
+2. Open the browser extensions page
 3. Click `Reload`
-4. Test again on an X page
+4. Refresh an X page and test again
 
 ## License
 
