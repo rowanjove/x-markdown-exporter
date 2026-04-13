@@ -7,7 +7,9 @@
   const _XPD = window._XPD;
   const core = _XPD.core;
 
-  // ── Metadata & comments assembly ───────────────────────────────────
+  const EMBED_WARN_THRESHOLD_BYTES = 12 * 1024 * 1024;
+
+  // Metadata & comments assembly
 
   function buildMetadata(author, time, stats, options) {
     let md = '';
@@ -18,6 +20,9 @@
     }
     if (options.includeTime && time) {
       md += `**时间**: ${core.escapeMarkdownText(time)}\n\n`;
+    }
+    if (options.sourceUrl) {
+      md += `**source_url**: <${String(options.sourceUrl).replace(/>/g, '%3E')}>\n\n`;
     }
     if (options.includeStats) {
       md += `**互动**: ❤️ ${stats.likes} | 🔁 ${stats.retweets} | 💬 ${stats.replies}\n\n`;
@@ -42,7 +47,7 @@
     return md;
   }
 
-  // ── Markdown finalization ──────────────────────────────────────────
+  // Markdown finalization
 
   function finalizeMarkdown(mdLayout, imagesArray, replacementFunc) {
     let finalMd = mdLayout;
@@ -52,7 +57,26 @@
     return finalMd;
   }
 
-  // ── Image processing ───────────────────────────────────────────────
+  function buildThreadSection(threadTweets, replacementFunc) {
+    if (!threadTweets.length) return '';
+
+    let md = '---\n\n';
+    for (const tweet of threadTweets) {
+      md += finalizeMarkdown(tweet.t, tweet.imgs, replacementFunc) + '\n\n';
+    }
+    return md;
+  }
+
+  function composeMarkdown(titleText, textData, author, time, stats, threadTweets, options, replacementFunc) {
+    let md = `# ${titleText}\n\n`;
+    md += buildMetadata(author, time, stats, options);
+    md += finalizeMarkdown(textData.t, textData.imgs, replacementFunc) + '\n\n';
+    md += buildThreadSection(threadTweets, replacementFunc);
+    md += buildComments(options);
+    return md.replace(/\n{3,}/g, '\n\n');
+  }
+
+  // Image processing
 
   function fetchImageViaBackground(url) {
     return new Promise((resolve, reject) => {
@@ -115,36 +139,23 @@
     return matched?.[1]?.toLowerCase() || '';
   }
 
-  // ── Download modes ─────────────────────────────────────────────────
-
-  function downloadAsLink(titleText, textData, author, time, stats, threadTweets, options) {
-    let md = `# ${titleText}\n\n`;
-    md += buildMetadata(author, time, stats, options);
-    md += finalizeMarkdown(textData.t, textData.imgs, (url) => url) + '\n\n';
-
-    if (threadTweets.length) {
-      md += '---\n\n';
-      for (const tweet of threadTweets) {
-        md += finalizeMarkdown(tweet.t, tweet.imgs, (url) => url) + '\n\n';
-      }
-    }
-    md += buildComments(options);
-    triggerDownloadFile(md, core.makeFilename(titleText, author, options.isArticle) + '.md');
+  function isDataUrl(value) {
+    return /^data:[^;]+;base64,/i.test(value || '');
   }
 
-  async function downloadAsEmbed(titleText, textData, author, time, stats, threadTweets, options) {
-    let md = `# ${titleText}\n\n`;
-    md += buildMetadata(author, time, stats, options);
-
+  function collectAllImages(textData, threadTweets) {
     const allImages = [...textData.imgs];
     for (const tweet of threadTweets) allImages.push(...tweet.imgs);
+    return allImages;
+  }
 
+  async function prepareProcessedImages(imageUrls, progressLabel) {
+    const uniqueImages = [...new Set(imageUrls)];
     const processedImages = {};
-    let imgCount = 0;
-    for (const url of allImages) {
-      if (processedImages[url]) continue;
-      imgCount += 1;
-      _XPD.sendProgress?.(`正在压缩图片 ${imgCount}/${allImages.length}...`);
+
+    for (let i = 0; i < uniqueImages.length; i += 1) {
+      const url = uniqueImages[i];
+      _XPD.sendProgress?.(`${progressLabel} ${i + 1}/${uniqueImages.length}...`);
       try {
         const { base64, contentType } = await fetchImageViaBackground(url);
         processedImages[url] = await compressImage(base64, contentType);
@@ -154,37 +165,114 @@
       }
     }
 
-    md += finalizeMarkdown(textData.t, textData.imgs, (url) => processedImages[url]) + '\n\n';
-    if (threadTweets.length) {
-      md += '---\n\n';
-      for (const tweet of threadTweets) {
-        md += finalizeMarkdown(tweet.t, tweet.imgs, (url) => processedImages[url]) + '\n\n';
-      }
-    }
-    md += buildComments(options);
-    _XPD.sendProgress?.('正在保存文件...');
+    return { uniqueImages, processedImages };
+  }
+
+  function estimateMarkdownSize(markdown) {
+    return new Blob([markdown], { type: 'text/plain;charset=utf-8' }).size;
+  }
+
+  function formatBytes(bytes) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function addDataUrlToZip(zip, dataUrl, index) {
+    const outputContentType = getDataUrlContentType(dataUrl);
+    const extension = getImageExtension(outputContentType);
+    const localPath = `images/image_${index + 1}${extension}`;
+    zip.file(localPath, dataUrl.split(',')[1], { base64: true });
+    return localPath;
+  }
+
+  // Download modes
+
+  function downloadAsLink(titleText, textData, author, time, stats, threadTweets, options) {
+    const md = composeMarkdown(
+      titleText,
+      textData,
+      author,
+      time,
+      stats,
+      threadTweets,
+      options,
+      (url) => url
+    );
     triggerDownloadFile(md, core.makeFilename(titleText, author, options.isArticle) + '.md');
   }
 
-  async function downloadAsZip(titleText, textData, author, time, stats, threadTweets, options) {
-    const zip = new JSZip();
-    const allImages = [...textData.imgs];
-    for (const tweet of threadTweets) allImages.push(...tweet.imgs);
+  async function downloadAsEmbed(titleText, textData, author, time, stats, threadTweets, options) {
+    const allImages = collectAllImages(textData, threadTweets);
+    const { processedImages } = await prepareProcessedImages(allImages, '正在压缩图片');
 
-    const uniqueImages = [...new Set(allImages)];
+    const finalMd = composeMarkdown(
+      titleText,
+      textData,
+      author,
+      time,
+      stats,
+      threadTweets,
+      options,
+      (url) => processedImages[url] || url
+    );
+    const estimatedBytes = estimateMarkdownSize(finalMd);
+
+    if (estimatedBytes > EMBED_WARN_THRESHOLD_BYTES) {
+      const estimatedSize = formatBytes(estimatedBytes);
+      _XPD.sendProgress?.('内嵌文件较大，等待确认...');
+      const shouldContinueEmbed = window.confirm(
+        `预计导出的 Markdown 约 ${estimatedSize}，继续使用 embed 模式可能导致编辑器卡顿。\n\n选择“确定”继续导出单文件；选择“取消”将自动改用 ZIP 打包。`
+      );
+
+      if (!shouldContinueEmbed) {
+        _XPD.sendProgress?.('内嵌文件过大，正在切换到 ZIP 打包...');
+        await downloadAsZip(
+          titleText,
+          textData,
+          author,
+          time,
+          stats,
+          threadTweets,
+          options,
+          processedImages
+        );
+        return;
+      }
+    }
+
+    _XPD.sendProgress?.('正在保存文件...');
+    triggerDownloadFile(finalMd, core.makeFilename(titleText, author, options.isArticle) + '.md');
+  }
+
+  async function downloadAsZip(
+    titleText,
+    textData,
+    author,
+    time,
+    stats,
+    threadTweets,
+    options,
+    preparedImages = null
+  ) {
+    const zip = new JSZip();
+    const uniqueImages = [...new Set(collectAllImages(textData, threadTweets))];
     const imageTargets = {};
 
     for (let i = 0; i < uniqueImages.length; i += 1) {
       const url = uniqueImages[i];
-      _XPD.sendProgress?.(`正在下载图片 ${i + 1}/${uniqueImages.length}...`);
+      _XPD.sendProgress?.(`正在打包图片 ${i + 1}/${uniqueImages.length}...`);
+
+      const preparedDataUrl = preparedImages?.[url];
+      if (isDataUrl(preparedDataUrl)) {
+        imageTargets[url] = addDataUrlToZip(zip, preparedDataUrl, i);
+        continue;
+      }
+
       try {
         const { base64, contentType } = await fetchImageViaBackground(url);
         const compressedDataUrl = await compressImage(base64, contentType);
-        const outputContentType = getDataUrlContentType(compressedDataUrl) || contentType;
-        const extension = getImageExtension(outputContentType);
-        const localPath = `images/image_${i + 1}${extension}`;
-        zip.file(localPath, compressedDataUrl.split(',')[1], { base64: true });
-        imageTargets[url] = localPath;
+        imageTargets[url] = addDataUrlToZip(zip, compressedDataUrl, i);
       } catch (error) {
         console.warn(`[XPD] Failed to download image ${i + 1}:`, error.message);
         // Keep the original remote URL in Markdown instead of pointing at
@@ -193,24 +281,24 @@
       }
     }
 
-    let md = `# ${titleText}\n\n`;
-    md += buildMetadata(author, time, stats, options);
-    md += finalizeMarkdown(textData.t, textData.imgs, (url) => imageTargets[url] || url) + '\n\n';
-    if (threadTweets.length) {
-      md += '---\n\n';
-      for (const tweet of threadTweets) {
-        md += finalizeMarkdown(tweet.t, tweet.imgs, (url) => imageTargets[url] || url) + '\n\n';
-      }
-    }
-    md += buildComments(options);
-    zip.file('post.md', md.replace(/\n{3,}/g, '\n\n'));
+    const md = composeMarkdown(
+      titleText,
+      textData,
+      author,
+      time,
+      stats,
+      threadTweets,
+      options,
+      (url) => imageTargets[url] || url
+    );
+    zip.file('post.md', md);
 
     _XPD.sendProgress?.('正在打包 ZIP...');
     const blob = await zip.generateAsync({ type: 'blob' });
     triggerDownloadBlob(blob, core.makeFilename(titleText, author, options.isArticle) + '.zip');
   }
 
-  // ── File download triggers ─────────────────────────────────────────
+  // File download triggers
 
   function triggerDownloadFile(content, filename) {
     const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
@@ -231,7 +319,7 @@
     }, 1000);
   }
 
-  // ── Export module ──────────────────────────────────────────────────
+  // Export module
 
   _XPD.exp = {
     buildMetadata,

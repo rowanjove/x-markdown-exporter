@@ -16,7 +16,7 @@
     includeComments: false,
   });
 
-  // ── Progress bridge ────────────────────────────────────────────────
+  // Progress bridge
 
   function sendProgress(text) {
     ui.updateProgressText(text);
@@ -26,7 +26,7 @@
   // Expose sendProgress so core and export modules can call it.
   _XPD.sendProgress = sendProgress;
 
-  // ── Options normalization ──────────────────────────────────────────
+  // Options normalization
 
   /**
    * Merge caller options with defaults.
@@ -38,21 +38,26 @@
     return { ...DEFAULT_EXPORT_OPTIONS, ...(options || {}) };
   }
 
-  // ── Core extract-and-download orchestrator ─────────────────────────
+  // Core extract-and-download orchestrator
 
   async function handleExtractAndDownload(options, mode) {
     const exportOptions = normalizeOptions(options);
+    exportOptions.isArticle = core.detectArticlePage();
+    exportOptions.sourceUrl = core.getSourceUrl();
 
     sendProgress('正在查找内容...');
 
-    const isArticle = core.detectArticlePage();
-    exportOptions.isArticle = isArticle;
-    console.log('[XPD] Page type:', isArticle ? 'ARTICLE' : 'TWEET');
+    console.log('[XPD] Page type:', exportOptions.isArticle ? 'ARTICLE' : 'TWEET');
 
-    let textData, author, time, stats, threadTweets;
+    let textData;
+    let author;
+    let time;
+    let stats;
+    let threadTweets;
 
-    if (isArticle) {
+    if (exportOptions.isArticle) {
       const articleData = core.extractArticle();
+      core.validateExtracted(articleData, 'Note 页面');
       textData = { t: articleData.text, imgs: articleData.images };
       author = articleData.author;
       time = articleData.time;
@@ -60,10 +65,16 @@
       threadTweets = [];
     } else {
       const mainTweetEl = core.getMainTweet();
-      if (!mainTweetEl) throw new Error('未找到当前推文内容');
+      if (!mainTweetEl) {
+        throw new core.ExtractionError(
+          'MAIN_TWEET_NOT_FOUND',
+          `未找到当前推文正文。请先打开推文详情页后重试；如果仍然失败，请到 GitHub 提 Issue: ${core.GITHUB_ISSUES_URL}`
+        );
+      }
 
       sendProgress('正在提取正文...');
       textData = core.extractRichContent(mainTweetEl);
+      core.validateExtracted(textData, '推文');
       author = core.extractAuthorInfo(mainTweetEl);
       time = core.extractTime(mainTweetEl);
       stats = core.extractStats(mainTweetEl);
@@ -75,10 +86,6 @@
       images: textData.imgs.length,
       thread: threadTweets.length,
     });
-
-    if (!textData.t && textData.imgs.length === 0 && threadTweets.length === 0) {
-      throw new Error('没能提取到任何内容，请刷新页面后重试');
-    }
 
     const titleText = core.deriveTitleText(textData.t);
 
@@ -96,7 +103,7 @@
   // Expose so UI module can call it from the floating panel download button.
   _XPD.handleExtractAndDownload = handleExtractAndDownload;
 
-  // ── Message listener ───────────────────────────────────────────────
+  // Message listener
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'PING') {
@@ -122,7 +129,7 @@
     return false;
   });
 
-  // ── Bootstrap ──────────────────────────────────────────────────────
+  // Bootstrap
 
   ui.initFloatingUi();
   ui.startUrlWatcher();

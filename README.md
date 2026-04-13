@@ -8,12 +8,12 @@ X Markdown Exporter is a Chrome / Edge extension for exporting X (Twitter) posts
 
 ## Latest Update
 
-### v1.4.1
+### v1.5.0
 
-- Improve extraction stability for quoted tweets, nested rich-text images, and long-form pages
-- Make ZIP exports safer by keeping valid image references when image downloads fail
-- Add a timestamp fallback for untitled long-form exports
-- Keep the toolbar popup available for both tweet detail pages and Note pages
+- Detect empty DOM extractions and show actionable failure messages with a GitHub issue link
+- Add `source_url` metadata to every export
+- Warn before oversized `embed` exports and offer an automatic fallback to ZIP
+- Reuse already-processed images when `embed` switches to ZIP packaging
 
 ## Preview
 
@@ -75,7 +75,7 @@ Markdown 和图片分开保存，再打包成 ZIP。
 #### 方式一：从 GitHub Releases 下载
 
 1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. 下载最新版本里的 `x-markdown-exporter-v1.4.1.zip`
+2. 下载最新版本里的 `x-markdown-exporter-v1.5.0.zip`
 3. 解压 ZIP 文件
 4. 打开扩展管理页
    Chrome: `chrome://extensions/`
@@ -181,7 +181,8 @@ X Markdown Exporter exports X / Twitter posts, threads, and long-form notes into
 - Export same-author thread continuations
 - Convert supported link preview cards into Markdown links with title / summary / domain
 - Support `link`, `embed`, and `zip` output modes
-- Include author and publish time by default
+- Include author, publish time, and `source_url` by default
+- Guard oversized `embed` exports by offering a ZIP fallback
 - Run fully in the browser with no backend service
 
 ### Export Modes
@@ -197,7 +198,7 @@ Best for:
 
 #### `embed`
 
-Compress images and embed them as Base64 in a single Markdown file.
+Compress images and embed them as Base64 in a single Markdown file. Oversized exports warn first and can fall back to ZIP automatically.
 
 Best for:
 
@@ -218,7 +219,7 @@ Best for:
 #### Option 1: Download from GitHub Releases
 
 1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. Download `x-markdown-exporter-v1.4.1.zip`
+2. Download `x-markdown-exporter-v1.5.0.zip`
 3. Extract the ZIP file
 4. Open the extensions page
    Chrome: `chrome://extensions/`
@@ -287,7 +288,7 @@ The toolbar popup is still available as a fallback entry point.
 ### Known Limitations
 
 - The extension is designed for post detail pages and Note pages, not the main timeline feed
-- If X changes its DOM structure significantly, the extraction rules may need updates
+- If X changes its DOM structure significantly, the extraction rules may need updates, but empty exports now fail with a clearer warning instead of silently saving a blank file
 - Most preview cards are handled, but a few complex cards may still be incomplete
 
 ### Privacy

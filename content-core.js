@@ -12,6 +12,7 @@
   const JPEG_QUALITY = 0.7;
   const POST_DETAIL_URL_RE =
     /^https:\/\/(x\.com|twitter\.com)\/[^/]+\/(status|i\/web\/status)\/\d+/i;
+  const GITHUB_ISSUES_URL = 'https://github.com/Renn9527/x-markdown-exporter/issues';
   const ARTICLE_CONTENT_SELECTOR =
     '[data-testid="article-content"], ' +
     '[data-testid="noteContent"], ' +
@@ -101,6 +102,49 @@
     if (href.startsWith('//')) return `https:${href}`;
     if (href.startsWith('/')) return `https://x.com${href}`;
     return '';
+  }
+
+  function getSourceUrl(href = window.location.href) {
+    try {
+      const parsed = new URL(href);
+      return `${parsed.origin}${parsed.pathname}`;
+    } catch {
+      return String(href || '').split('#')[0];
+    }
+  }
+
+  class ExtractionError extends Error {
+    constructor(code, message) {
+      super(message);
+      this.name = 'ExtractionError';
+      this.code = code;
+    }
+  }
+
+  function hasMeaningfulExtractedText(text) {
+    return stripMarkdownSyntax(stripImageMarkdown(text || '')).length > 0;
+  }
+
+  function buildExtractionRetryHint(pageLabel) {
+    if (pageLabel === '推文') return '请先打开推文详情页后重试';
+    if (pageLabel === 'Note 页面') return '请先打开 Note 页面后重试';
+    return '请刷新页面后重试';
+  }
+
+  function buildExtractionFailureMessage(pageLabel) {
+    const retryHint = buildExtractionRetryHint(pageLabel);
+    return `${pageLabel}内容提取为空，可能是 X 页面结构已更新。${retryHint}；如果仍然失败，请到 GitHub 提 Issue: ${GITHUB_ISSUES_URL}`;
+  }
+
+  function validateExtracted(result, pageLabel = '当前页面') {
+    const text = result?.text ?? result?.t ?? '';
+    const images = result?.images ?? result?.imgs ?? [];
+    const hasText = hasMeaningfulExtractedText(text);
+    const hasMedia = Array.isArray(images) && images.length > 0;
+
+    if (!hasText && !hasMedia) {
+      throw new ExtractionError('DOM_EMPTY', buildExtractionFailureMessage(pageLabel));
+    }
   }
 
   function getArticleContainers(root = document) {
@@ -636,6 +680,10 @@
     deriveTitleText,
     upgradeImageUrl,
     normalizeAnchorUrl,
+    getSourceUrl,
+    ExtractionError,
+    validateExtracted,
+    GITHUB_ISSUES_URL,
     detectArticlePage,
     getMainTweet,
     extractArticle,
