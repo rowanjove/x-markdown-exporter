@@ -40,16 +40,20 @@ function updateModeUi(mode) {
 document.querySelectorAll('.mode-btn').forEach((btn) => {
   btn.addEventListener('click', () => {
     updateModeUi(btn.dataset.mode);
-    localStorage.setItem('xpd_mode', currentMode);
+    // Fix #13: use chrome.storage.local instead of localStorage
+    chrome.storage.local.set({ xpd_mode: currentMode });
   });
 });
 
-const savedMode = localStorage.getItem('xpd_mode');
-if (savedMode && MODE_DESCS[savedMode]) {
-  updateModeUi(savedMode);
-} else {
-  updateModeUi(currentMode);
-}
+// Fix #13: load mode from chrome.storage.local
+chrome.storage.local.get('xpd_mode', (result) => {
+  const savedMode = result?.xpd_mode;
+  if (savedMode && MODE_DESCS[savedMode]) {
+    updateModeUi(savedMode);
+  } else {
+    updateModeUi(currentMode);
+  }
+});
 
 async function checkCurrentPage() {
   try {
@@ -62,8 +66,8 @@ async function checkCurrentPage() {
     currentTabId = tab.id;
     const url = tab.url || '';
 
-    if (!url.match(/https:\/\/(x\.com|twitter\.com)\/[^/]+\/(status|i\/web\/status)\/\d+/)) {
-      setStatus('no', '请打开 X 推文详情页');
+    if (!url.match(/^https:\/\/(x\.com|twitter\.com)\//)) {
+      setStatus('no', '请打开 X 推文详情页或 Note 页面');
       downloadBtn.disabled = true;
       return;
     }
@@ -76,11 +80,11 @@ async function checkCurrentPage() {
       } else {
         setStatus('no', '页面还没准备好，请刷新后重试');
       }
-    } catch (error) {
+    } catch {
       setStatus('no', '页面还没准备好，请刷新后重试');
     }
-  } catch (error) {
-    setStatus('no', `检测失败: ${error.message}`);
+  } catch {
+    setStatus('no', '检测失败，请重试');
   }
 }
 
@@ -123,8 +127,9 @@ downloadBtn.addEventListener('click', async () => {
     } else {
       showResult('error', response?.error || '下载失败');
     }
-  } catch (error) {
-    showResult('error', `下载失败: ${error.message}`);
+  } catch {
+    // Fix #12: friendly error message instead of raw error.message
+    showResult('error', '下载失败，请刷新页面后重试');
   } finally {
     downloadBtn.disabled = false;
     downloadBtn.textContent = '下载 Markdown';

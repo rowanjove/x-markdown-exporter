@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "X Markdown Exporter",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Export X (Twitter) posts and notes to Markdown with a draggable floating panel and link card support.",
   "permissions": [
-    "activeTab"
+    "activeTab",
+    "storage"
   ],
   "host_permissions": [
     "https://x.com/*",
@@ -12,6 +13,9 @@
     "https://pbs.twimg.com/*",
     "https://abs.twimg.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'"
+  },
   "background": {
     "service_worker": "background.js"
   },
@@ -26,6 +30,9 @@
       ],
       "js": [
         "jszip.min.js",
+        "content-core.js",
+        "content-export.js",
+        "content-ui.js",
         "content.js"
       ],
       "run_at": "document_idle"

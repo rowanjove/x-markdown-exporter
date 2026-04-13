@@ -1,0 +1,631 @@
+// X Markdown Exporter - UI Module
+// Floating panel, drag interaction, status management, and chrome.storage sync.
+
+(function () {
+  'use strict';
+
+  const _XPD = window._XPD;
+  const core = _XPD.core;
+
+  // ── UI constants (Chinese literals, fix #11) ───────────────────────
+
+  const MODE_LABELS = Object.freeze({
+    link: '链接引用',
+    embed: '内嵌图片',
+    zip: 'ZIP 打包',
+  });
+
+  const MODE_DESCS = Object.freeze({
+    link: '图片会保留原始链接，生成的 Markdown 最轻量。',
+    embed: '图片压缩后以内嵌方式写入 Markdown，单文件保存更省心。',
+    zip: 'Markdown 和图片一起打包成 ZIP，适合完整离线归档。',
+  });
+
+  const UI_TEXT = Object.freeze({
+    launcherTitle: 'X Markdown Exporter，拖动可移动',
+    title: 'X Markdown Exporter',
+    subtitle: '保存当前推文或 Note',
+    modeTitle: '导出模式',
+    checking: '检测中...',
+    ready: '可以下载当前内容',
+    unsupported: '请打开 X 推文详情页或 Note 页面',
+    notReady: '页面还没准备好，请稍后再试',
+    note: '默认会附带作者和时间。',
+    download: '下载 Markdown',
+    processing: '处理中...',
+    refresh: '刷新',
+    refreshLoading: '正在刷新页面...',
+    progressDefault: '正在提取内容...',
+    downloadSuccess: '下载成功',
+    downloadFailed: '下载失败',
+    close: '关闭',
+  });
+
+  const FLOATING_TOP_STORAGE_KEY = 'xpd_float_top';
+  const FLOATING_RIGHT_STORAGE_KEY = 'xpd_float_right';
+  const FLOATING_DEFAULT_TOP = 104;
+  const FLOATING_DEFAULT_RIGHT = 18;
+  const FLOATING_DRAG_THRESHOLD = 6;
+
+  // ── UI state ───────────────────────────────────────────────────────
+
+  const uiState = {
+    root: null,
+    launcher: null,
+    launcherBadge: null,
+    panel: null,
+    status: null,
+    statusText: null,
+    modeDesc: null,
+    downloadBtn: null,
+    refreshBtn: null,
+    closeBtn: null,
+    progress: null,
+    progressText: null,
+    result: null,
+    toast: null,
+    currentMode: 'embed',
+    ready: false,
+    open: false,
+    busyCount: 0,
+    lastUrl: window.location.href,
+    resultTimer: null,
+    toastTimer: null,
+    refreshTimers: [],
+    urlWatcherInterval: null,
+    abortController: null,
+    floatingTop: FLOATING_DEFAULT_TOP,
+    floatingRight: FLOATING_DEFAULT_RIGHT,
+    panelSide: 'left',
+    dragPointerId: null,
+    dragStartX: 0,
+    dragStartY: 0,
+    dragStartRight: FLOATING_DEFAULT_RIGHT,
+    dragStartTop: FLOATING_DEFAULT_TOP,
+    dragMoved: false,
+    suppressClickUntil: 0,
+  };
+
+  // ── Initialization ─────────────────────────────────────────────────
+
+  function initFloatingUi() {
+    if (!document.documentElement) return;
+
+    // Cleanup previous instance (fix #9: AbortController for event listeners)
+    if (uiState.abortController) {
+      uiState.abortController.abort();
+    }
+    const existingRoot = document.getElementById('xpd-floating-root');
+    if (existingRoot) existingRoot.remove();
+    if (uiState.urlWatcherInterval) {
+      clearInterval(uiState.urlWatcherInterval);
+      uiState.urlWatcherInterval = null;
+    }
+
+    uiState.abortController = new AbortController();
+    const { signal } = uiState.abortController;
+
+    const root = document.createElement('div');
+    root.id = 'xpd-floating-root';
+    root.innerHTML = getFloatingUiMarkup();
+
+    (document.body || document.documentElement).appendChild(root);
+
+    uiState.root = root;
+    uiState.launcher = root.querySelector('[data-role="launcher"]');
+    uiState.launcherBadge = root.querySelector('[data-role="launcherBadge"]');
+    uiState.panel = root.querySelector('[data-role="panel"]');
+    uiState.status = root.querySelector('[data-role="status"]');
+    uiState.statusText = root.querySelector('[data-role="statusText"]');
+    uiState.modeDesc = root.querySelector('[data-role="modeDesc"]');
+    uiState.downloadBtn = root.querySelector('[data-role="downloadBtn"]');
+    uiState.refreshBtn = root.querySelector('[data-role="refreshBtn"]');
+    uiState.closeBtn = root.querySelector('[data-role="closeBtn"]');
+    uiState.progress = root.querySelector('[data-role="progress"]');
+    uiState.progressText = root.querySelector('[data-role="progressText"]');
+    uiState.result = root.querySelector('[data-role="result"]');
+    uiState.toast = root.querySelector('[data-role="toast"]');
+
+    // Internal listeners (on root, cleaned up with DOM removal)
+    root.addEventListener('pointerdown', stopUiPropagation);
+    root.addEventListener('click', stopUiPropagation);
+    uiState.launcher.addEventListener('click', handleLauncherClick);
+    uiState.launcher.addEventListener('pointerdown', handleLauncherPointerDown);
+    uiState.launcher.addEventListener('pointermove', handleLauncherPointerMove);
+    uiState.launcher.addEventListener('pointerup', handleLauncherPointerEnd);
+    uiState.launcher.addEventListener('pointercancel', handleLauncherPointerEnd);
+    uiState.closeBtn.addEventListener('click', () => setPanelOpen(false));
+    uiState.refreshBtn.addEventListener('click', handleRefreshClick);
+    uiState.downloadBtn.addEventListener('click', handleFloatingDownload);
+
+    root.querySelectorAll('[data-mode]').forEach((button) => {
+      button.addEventListener('click', () => updateModeUi(button.dataset.mode));
+    });
+
+    // Global listeners with AbortController (fix #9)
+    document.addEventListener('pointerdown', handleDocumentPointerDown, { capture: true, signal });
+    document.addEventListener('keydown', handleDocumentKeydown, { capture: true, signal });
+    document.addEventListener('visibilitychange', handleVisibilityChange, { capture: true, signal });
+    window.addEventListener('resize', handleViewportResize, { capture: true, signal });
+
+    // Load settings from chrome.storage (fix #13)
+    loadSettings().then((settings) => {
+      uiState.currentMode = settings.mode;
+      uiState.floatingTop = settings.top;
+      uiState.floatingRight = settings.right;
+      updateModeUi(uiState.currentMode);
+      applyFloatingPosition(
+        { top: uiState.floatingTop, right: uiState.floatingRight },
+        { persist: false, includePanel: false }
+      );
+    });
+
+    // Apply defaults immediately while storage loads
+    updateModeUi(uiState.currentMode);
+    applyFloatingPosition(
+      { top: uiState.floatingTop, right: uiState.floatingRight },
+      { persist: false, includePanel: false }
+    );
+
+    updateProgressText(UI_TEXT.progressDefault);
+    clearResult();
+    syncUiControls();
+  }
+
+  // ── Settings persistence via chrome.storage (fix #13) ──────────────
+
+  function loadSettings() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(
+        ['xpd_mode', FLOATING_TOP_STORAGE_KEY, FLOATING_RIGHT_STORAGE_KEY],
+        (result) => {
+          const savedMode = result?.xpd_mode;
+          const savedTop = Number(result?.[FLOATING_TOP_STORAGE_KEY]);
+          const savedRight = Number(result?.[FLOATING_RIGHT_STORAGE_KEY]);
+          const mode = MODE_DESCS[savedMode] ? savedMode : 'embed';
+          const pos = clampFloatingPosition(
+            {
+              top: Number.isFinite(savedTop) ? savedTop : FLOATING_DEFAULT_TOP,
+              right: Number.isFinite(savedRight) ? savedRight : FLOATING_DEFAULT_RIGHT,
+            },
+            false
+          );
+          resolve({ mode, top: pos.top, right: pos.right });
+        }
+      );
+    });
+  }
+
+  function saveMode(mode) {
+    chrome.storage.local.set({ xpd_mode: mode });
+  }
+
+  function saveFloatingPosition(top, right) {
+    chrome.storage.local.set({
+      [FLOATING_TOP_STORAGE_KEY]: Math.round(top),
+      [FLOATING_RIGHT_STORAGE_KEY]: Math.round(right),
+    });
+  }
+
+  // ── HTML template (with escapeHtml, fix #1) ────────────────────────
+
+  function getFloatingUiMarkup() {
+    const h = core.escapeHtml;
+    return `
+      <section class="xpd-panel" data-role="panel" aria-hidden="true">
+        <div class="xpd-panel__inner">
+          <div class="xpd-header">
+            <div>
+              <h2 class="xpd-header__title">${h(UI_TEXT.title)}</h2>
+              <p class="xpd-header__meta">${h(UI_TEXT.subtitle)}</p>
+            </div>
+            <button class="xpd-close" data-role="closeBtn" type="button" aria-label="${h(UI_TEXT.close)}" title="${h(UI_TEXT.close)}">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4Z"></path>
+              </svg>
+            </button>
+          </div>
+          <div class="xpd-status xpd-status--loading" data-role="status">
+            <span class="xpd-status__dot"></span>
+            <span data-role="statusText">${h(UI_TEXT.checking)}</span>
+          </div>
+          <div class="xpd-mode-card">
+            <div class="xpd-section-title">${h(UI_TEXT.modeTitle)}</div>
+            <div class="xpd-mode-selector">
+              <button class="xpd-mode-btn" data-mode="link" type="button">${h(MODE_LABELS.link)}</button>
+              <button class="xpd-mode-btn" data-mode="embed" type="button">${h(MODE_LABELS.embed)}</button>
+              <button class="xpd-mode-btn" data-mode="zip" type="button">${h(MODE_LABELS.zip)}</button>
+            </div>
+            <p class="xpd-mode-desc" data-role="modeDesc"></p>
+          </div>
+          <div class="xpd-note">${h(UI_TEXT.note)}</div>
+          <div class="xpd-actions">
+            <button class="xpd-btn xpd-btn--primary" data-role="downloadBtn" type="button">${h(UI_TEXT.download)}</button>
+            <button class="xpd-btn xpd-btn--secondary" data-role="refreshBtn" type="button">${h(UI_TEXT.refresh)}</button>
+          </div>
+          <div class="xpd-progress" data-role="progress">
+            <span class="xpd-spinner" aria-hidden="true"></span>
+            <span data-role="progressText">${h(UI_TEXT.progressDefault)}</span>
+          </div>
+          <div class="xpd-result" data-role="result"></div>
+        </div>
+      </section>
+      <button class="xpd-launcher" data-role="launcher" type="button" aria-label="${h(UI_TEXT.launcherTitle)}" aria-expanded="false" title="${h(UI_TEXT.launcherTitle)}">
+        <span class="xpd-launcher__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.3a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.3V4a1 1 0 0 1 1-1Zm-7 15a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"></path>
+          </svg>
+        </span>
+        <span class="xpd-launcher__badge" data-role="launcherBadge" data-state="loading"></span>
+      </button>
+      <div class="xpd-toast" data-role="toast"></div>
+    `;
+  }
+
+  // ── Mode management ────────────────────────────────────────────────
+
+  function updateModeUi(mode) {
+    if (!MODE_DESCS[mode]) return;
+    uiState.currentMode = mode;
+    saveMode(mode);
+    if (uiState.root) {
+      uiState.root.querySelectorAll('[data-mode]').forEach((button) => {
+        button.classList.toggle('xpd-active', button.dataset.mode === mode);
+      });
+    }
+    if (uiState.modeDesc) {
+      uiState.modeDesc.textContent = MODE_DESCS[mode];
+    }
+  }
+
+  // ── Event handlers ─────────────────────────────────────────────────
+
+  function stopUiPropagation(event) {
+    event.stopPropagation();
+  }
+
+  function handleLauncherClick() {
+    if (Date.now() < uiState.suppressClickUntil) return;
+    const nextOpen = !uiState.open;
+    setPanelOpen(nextOpen);
+    if (nextOpen) refreshPanelStatus();
+  }
+
+  function handleLauncherPointerDown(event) {
+    if (event.button !== 0) return;
+    uiState.dragPointerId = event.pointerId;
+    uiState.dragStartX = event.clientX;
+    uiState.dragStartY = event.clientY;
+    uiState.dragStartRight = uiState.floatingRight;
+    uiState.dragStartTop = uiState.floatingTop;
+    uiState.dragMoved = false;
+    if (uiState.launcher?.setPointerCapture) {
+      uiState.launcher.setPointerCapture(event.pointerId);
+    }
+  }
+
+  function handleLauncherPointerMove(event) {
+    if (event.pointerId !== uiState.dragPointerId) return;
+    const deltaX = event.clientX - uiState.dragStartX;
+    const deltaY = event.clientY - uiState.dragStartY;
+    if (!uiState.dragMoved && Math.hypot(deltaX, deltaY) < FLOATING_DRAG_THRESHOLD) return;
+
+    if (!uiState.dragMoved) {
+      uiState.dragMoved = true;
+      if (uiState.root) uiState.root.classList.add('xpd-dragging');
+      if (uiState.open) setPanelOpen(false);
+    }
+    event.preventDefault();
+    applyFloatingPosition(
+      { top: uiState.dragStartTop + deltaY, right: uiState.dragStartRight - deltaX },
+      { persist: false, includePanel: false }
+    );
+  }
+
+  function handleLauncherPointerEnd(event) {
+    if (event.pointerId !== uiState.dragPointerId) return;
+    if (uiState.launcher?.hasPointerCapture?.(event.pointerId)) {
+      uiState.launcher.releasePointerCapture(event.pointerId);
+    }
+    if (uiState.dragMoved) {
+      uiState.suppressClickUntil = Date.now() + 250;
+      saveFloatingPosition(uiState.floatingTop, uiState.floatingRight);
+    }
+    if (uiState.root) uiState.root.classList.remove('xpd-dragging');
+    uiState.dragPointerId = null;
+    uiState.dragMoved = false;
+  }
+
+  function handleDocumentPointerDown(event) {
+    if (!uiState.open || !uiState.root) return;
+    if (uiState.root.contains(event.target)) return;
+    setPanelOpen(false);
+  }
+
+  function handleDocumentKeydown(event) {
+    if (event.key === 'Escape' && uiState.open) setPanelOpen(false);
+  }
+
+  function handleVisibilityChange() {
+    if (!document.hidden) schedulePanelStatusRefresh();
+  }
+
+  function handleViewportResize() {
+    applyFloatingPosition(
+      { top: uiState.floatingTop, right: uiState.floatingRight },
+      { persist: false, includePanel: uiState.open }
+    );
+  }
+
+  function handleRefreshClick() {
+    setStatus('loading', UI_TEXT.refreshLoading);
+    window.location.reload();
+  }
+
+  async function handleFloatingDownload() {
+    const availability = refreshPanelStatus();
+    if (!availability.ready) {
+      showResult('error', availability.message);
+      showToast('error', availability.message);
+      return;
+    }
+    beginUiWork();
+    try {
+      const response = await _XPD.handleExtractAndDownload(
+        { includeAuthor: true, includeTime: true, includeStats: false, includeComments: false },
+        uiState.currentMode
+      );
+      if (response?.success) {
+        showResult('success', UI_TEXT.downloadSuccess);
+        showToast('success', UI_TEXT.downloadSuccess);
+      } else {
+        const message = response?.error || UI_TEXT.downloadFailed;
+        showResult('error', message);
+        showToast('error', message);
+      }
+    } catch (error) {
+      const message = error?.message
+        ? `${UI_TEXT.downloadFailed}: ${error.message}`
+        : UI_TEXT.downloadFailed;
+      showResult('error', message);
+      showToast('error', message);
+    } finally {
+      endUiWork();
+      refreshPanelStatus();
+    }
+  }
+
+  // ── Panel open/close ───────────────────────────────────────────────
+
+  function setPanelOpen(nextOpen) {
+    uiState.open = Boolean(nextOpen);
+    if (uiState.root) uiState.root.classList.toggle('xpd-open', uiState.open);
+    if (uiState.panel) uiState.panel.setAttribute('aria-hidden', String(!uiState.open));
+    if (uiState.launcher) uiState.launcher.setAttribute('aria-expanded', String(uiState.open));
+
+    if (uiState.open) {
+      window.requestAnimationFrame(() => {
+        applyFloatingPosition(
+          { top: uiState.floatingTop, right: uiState.floatingRight },
+          { persist: false, includePanel: true }
+        );
+      });
+    }
+  }
+
+  // ── Busy / progress / result / toast ───────────────────────────────
+
+  function beginUiWork() {
+    uiState.busyCount += 1;
+    clearResult();
+    syncUiControls();
+  }
+
+  function endUiWork() {
+    uiState.busyCount = Math.max(0, uiState.busyCount - 1);
+    if (uiState.busyCount === 0) updateProgressText(UI_TEXT.progressDefault);
+    syncUiControls();
+  }
+
+  function syncUiControls() {
+    const isBusy = uiState.busyCount > 0;
+    if (uiState.downloadBtn) {
+      uiState.downloadBtn.disabled = isBusy || !uiState.ready;
+      uiState.downloadBtn.textContent = isBusy ? UI_TEXT.processing : UI_TEXT.download;
+    }
+    if (uiState.progress) uiState.progress.classList.toggle('xpd-show', isBusy);
+    if (uiState.launcher) uiState.launcher.classList.toggle('xpd-busy', isBusy);
+  }
+
+  function updateProgressText(text) {
+    if (uiState.progressText) uiState.progressText.textContent = text || UI_TEXT.progressDefault;
+  }
+
+  function showResult(type, text) {
+    if (!uiState.result) return;
+    if (uiState.resultTimer) window.clearTimeout(uiState.resultTimer);
+    uiState.result.className = `xpd-result xpd-result--${type} xpd-show`;
+    uiState.result.textContent = text;
+    uiState.resultTimer = window.setTimeout(() => clearResult(), 4000);
+  }
+
+  function clearResult() {
+    if (!uiState.result) return;
+    if (uiState.resultTimer) { window.clearTimeout(uiState.resultTimer); uiState.resultTimer = null; }
+    uiState.result.className = 'xpd-result';
+    uiState.result.textContent = '';
+  }
+
+  function showToast(type, text) {
+    if (!uiState.toast) return;
+    if (uiState.toastTimer) window.clearTimeout(uiState.toastTimer);
+    uiState.toast.className = `xpd-toast xpd-toast--${type} xpd-show`;
+    uiState.toast.textContent = text;
+    uiState.toastTimer = window.setTimeout(() => hideToast(), 3200);
+  }
+
+  function hideToast() {
+    if (!uiState.toast) return;
+    if (uiState.toastTimer) { window.clearTimeout(uiState.toastTimer); uiState.toastTimer = null; }
+    uiState.toast.className = 'xpd-toast';
+    uiState.toast.textContent = '';
+  }
+
+  // ── Status management ──────────────────────────────────────────────
+
+  function setStatus(type, text) {
+    if (uiState.status) uiState.status.className = `xpd-status xpd-status--${type}`;
+    if (uiState.statusText) uiState.statusText.textContent = text;
+    if (uiState.launcherBadge) uiState.launcherBadge.dataset.state = type;
+  }
+
+  function evaluatePageAvailability() {
+    if (core.detectArticlePage()) {
+      return { ready: true, loading: false, message: UI_TEXT.ready };
+    }
+    if (core.POST_DETAIL_URL_RE.test(window.location.href)) {
+      if (core.getMainTweet()) {
+        return { ready: true, loading: false, message: UI_TEXT.ready };
+      }
+      return { ready: false, loading: true, message: UI_TEXT.notReady };
+    }
+    return { ready: false, loading: false, message: UI_TEXT.unsupported };
+  }
+
+  function refreshPanelStatus() {
+    const availability = evaluatePageAvailability();
+    uiState.ready = availability.ready;
+    setStatus(
+      availability.ready ? 'ok' : availability.loading ? 'loading' : 'no',
+      availability.message
+    );
+    syncUiControls();
+    return availability;
+  }
+
+  function schedulePanelStatusRefresh() {
+    clearScheduledPanelRefreshes();
+    [0, 700, 1600].forEach((delay) => {
+      const timerId = window.setTimeout(() => {
+        refreshPanelStatus();
+        uiState.refreshTimers = uiState.refreshTimers.filter((id) => id !== timerId);
+      }, delay);
+      uiState.refreshTimers.push(timerId);
+    });
+  }
+
+  function clearScheduledPanelRefreshes() {
+    uiState.refreshTimers.forEach((timerId) => window.clearTimeout(timerId));
+    uiState.refreshTimers = [];
+  }
+
+  // ── Floating position ──────────────────────────────────────────────
+
+  function getFloatingPadding() {
+    return window.innerWidth <= 760 ? 12 : 18;
+  }
+
+  function getLauncherMetrics() {
+    return {
+      width: uiState.launcher?.offsetWidth || 48,
+      height: uiState.launcher?.offsetHeight || 48,
+    };
+  }
+
+  function getPanelGap() {
+    return window.innerWidth <= 760 ? 8 : 10;
+  }
+
+  function clampFloatingPosition(position, includePanel) {
+    const padding = getFloatingPadding();
+    const { width: launcherWidth, height: launcherHeight } = getLauncherMetrics();
+    const floatingHeight = includePanel
+      ? Math.max(uiState.panel?.offsetHeight || 336, launcherHeight)
+      : launcherHeight;
+    const maxTop = Math.max(padding, window.innerHeight - floatingHeight - padding);
+    const maxRight = Math.max(padding, window.innerWidth - launcherWidth - padding);
+    return {
+      top: Math.min(Math.max(position.top, padding), maxTop),
+      right: Math.min(Math.max(position.right, padding), maxRight),
+    };
+  }
+
+  function updatePanelPlacement() {
+    if (!uiState.root) return;
+    const padding = getFloatingPadding();
+    const gap = getPanelGap();
+    const { width: launcherWidth } = getLauncherMetrics();
+    const viewportWidth = window.innerWidth;
+    const maxPanelWidth = Math.min(300, Math.max(180, viewportWidth - padding * 2));
+    const availableLeft = Math.max(
+      180, viewportWidth - uiState.floatingRight - launcherWidth - gap - padding
+    );
+    const availableRight = Math.max(180, uiState.floatingRight - gap - padding);
+    const nextSide =
+      availableLeft >= maxPanelWidth || availableLeft >= availableRight ? 'left' : 'right';
+    const availableForSide = nextSide === 'left' ? availableLeft : availableRight;
+    const nextWidth = Math.max(180, Math.min(maxPanelWidth, availableForSide));
+
+    uiState.panelSide = nextSide;
+    uiState.root.classList.toggle('xpd-panel-side-left', nextSide === 'left');
+    uiState.root.classList.toggle('xpd-panel-side-right', nextSide === 'right');
+    uiState.root.style.setProperty('--xpd-panel-gap', `${gap}px`);
+    uiState.root.style.setProperty('--xpd-panel-width', `${Math.round(nextWidth)}px`);
+  }
+
+  function applyFloatingPosition(position, options = {}) {
+    const includePanel = Boolean(options.includePanel);
+    const nextPosition = clampFloatingPosition(position, includePanel);
+    uiState.floatingTop = nextPosition.top;
+    uiState.floatingRight = nextPosition.right;
+
+    if (uiState.root) {
+      uiState.root.style.top = `${Math.round(nextPosition.top)}px`;
+      uiState.root.style.right = `${Math.round(nextPosition.right)}px`;
+      uiState.root.style.left = 'auto';
+      uiState.root.style.bottom = 'auto';
+    }
+    updatePanelPlacement();
+    if (options.persist !== false) {
+      saveFloatingPosition(nextPosition.top, nextPosition.right);
+    }
+    return nextPosition;
+  }
+
+  // ── URL watcher (fix #8: save interval ID) ─────────────────────────
+
+  function startUrlWatcher() {
+    if (uiState.urlWatcherInterval) clearInterval(uiState.urlWatcherInterval);
+
+    uiState.urlWatcherInterval = window.setInterval(() => {
+      if (window.location.href === uiState.lastUrl) return;
+      uiState.lastUrl = window.location.href;
+      uiState.ready = false;
+      setStatus('loading', UI_TEXT.checking);
+      syncUiControls();
+      clearResult();
+      hideToast();
+      applyFloatingPosition(
+        { top: uiState.floatingTop, right: uiState.floatingRight },
+        { persist: false, includePanel: uiState.open }
+      );
+      schedulePanelStatusRefresh();
+    }, 800);
+  }
+
+  // ── Export module ──────────────────────────────────────────────────
+
+  _XPD.ui = {
+    MODE_DESCS,
+    initFloatingUi,
+    startUrlWatcher,
+    schedulePanelStatusRefresh,
+    evaluatePageAvailability,
+    refreshPanelStatus,
+    beginUiWork,
+    endUiWork,
+    updateProgressText,
+    showResult,
+    showToast,
+  };
+})();

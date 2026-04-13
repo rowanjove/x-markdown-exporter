@@ -6,6 +6,15 @@
 
 X Markdown Exporter is a Chrome / Edge extension for exporting X (Twitter) posts, threads, and long-form notes into Markdown.
 
+## Latest Update
+
+### v1.4.1
+
+- Improve extraction stability for quoted tweets, nested rich-text images, and long-form pages
+- Make ZIP exports safer by keeping valid image references when image downloads fail
+- Add a timestamp fallback for untitled long-form exports
+- Keep the toolbar popup available for both tweet detail pages and Note pages
+
 ## Preview
 
 ### Export Example
@@ -66,7 +75,7 @@ Markdown 和图片分开保存，再打包成 ZIP。
 #### 方式一：从 GitHub Releases 下载
 
 1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. 下载最新版本里的 `x-markdown-exporter-v1.4.0.zip`
+2. 下载最新版本里的 `x-markdown-exporter-v1.4.1.zip`
 3. 解压 ZIP 文件
 4. 打开扩展管理页
    Chrome: `chrome://extensions/`
@@ -101,6 +110,9 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 ├─ popup.html
 ├─ popup.js
 ├─ content.js
+├─ content-core.js
+├─ content-export.js
+├─ content-ui.js
 ├─ content.css
 ├─ background.js
 ├─ jszip.min.js
@@ -112,9 +124,15 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 ### 技术说明
 
 - `content.js`
-  - 注入右侧悬浮入口和弹出面板
-  - 处理拖动定位、页面状态检查和导出触发
-  - 提取正文、图片、线程和链接卡片内容
+  - 作为内容脚本入口
+  - 负责消息监听、导出编排和模块初始化
+- `content-core.js`
+  - 处理正文、图片、线程、引用推文和链接卡片提取
+  - 负责标题和文件名生成
+- `content-export.js`
+  - 负责 Markdown 组装、图片压缩和三种下载模式
+- `content-ui.js`
+  - 负责悬浮按钮、面板、拖动交互和页面状态管理
 - `content.css`
   - 定义悬浮按钮、弹层和提示样式
 - `background.js`
@@ -200,7 +218,7 @@ Best for:
 #### Option 1: Download from GitHub Releases
 
 1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. Download `x-markdown-exporter-v1.4.0.zip`
+2. Download `x-markdown-exporter-v1.4.1.zip`
 3. Extract the ZIP file
 4. Open the extensions page
    Chrome: `chrome://extensions/`
@@ -235,6 +253,9 @@ The toolbar popup is still available as a fallback entry point.
 ├─ popup.html
 ├─ popup.js
 ├─ content.js
+├─ content-core.js
+├─ content-export.js
+├─ content-ui.js
 ├─ content.css
 ├─ background.js
 ├─ jszip.min.js
@@ -246,9 +267,15 @@ The toolbar popup is still available as a fallback entry point.
 ### Technical Notes
 
 - `content.js`
-  - injects the floating launcher and export panel
-  - handles dragging, page state checks, and export actions
-  - extracts text, images, threads, and supported link preview cards
+  - acts as the content-script entry point
+  - wires message handling, export orchestration, and module bootstrap
+- `content-core.js`
+  - extracts text, images, same-author threads, quoted tweets, and supported link preview cards
+  - generates titles and filenames
+- `content-export.js`
+  - assembles Markdown, compresses images, and handles all download modes
+- `content-ui.js`
+  - manages the floating launcher, panel UI, dragging, and page readiness state
 - `content.css`
   - styles the floating launcher, panel, and toasts
 - `background.js`
