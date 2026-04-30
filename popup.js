@@ -147,7 +147,7 @@ downloadBtn.addEventListener('click', async () => {
     showResult('error', '下载失败，请刷新页面后重试');
   } finally {
     setActionDisabled(false);
-    downloadBtn.textContent = '下载 Markdown';
+    downloadBtn.textContent = '下载';
     progressEl.classList.remove('show');
   }
 });

@@ -8,12 +8,10 @@ X Markdown Exporter is a Chrome / Edge extension for copying and archiving X (Tw
 
 ## Latest Update
 
-### v1.6.0
+### v1.6.1
 
-- Add one-click Markdown copy for feeding posts, threads, and Notes into OpenClaw, Claude Code, and similar tools
-- Show richer content labels such as post, article, thread, image count, quoted post, and link-card hints
-- Add clearer guidance for timeline, search, profile, explore, and still-loading pages
-- Refresh the README around AI-context handoff and local archiving workflows
+- Shorten the primary action label to `下载` / `Download` so the compact panel button fits better
+- Keep the v1.6 Markdown copy, content labels, and clearer page guidance
 
 ## Preview
 
@@ -89,7 +87,7 @@ Markdown 和图片分开保存，再打包成 ZIP。
 #### 方式一：从 GitHub Releases 下载
 
 1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. 下载最新版本里的 `x-markdown-exporter-v1.6.0.zip`
+2. 下载最新版本里的 `x-markdown-exporter-v1.6.1.zip`
 3. 解压 ZIP 文件
 4. 打开扩展管理页
    Chrome: `chrome://extensions/`
@@ -112,7 +110,7 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 2. 在页面右侧找到悬浮按钮
 3. 如果挡住内容，可以直接拖到更合适的位置
 4. 点开面板后选择导出模式
-5. 点击 `复制` 直接获取 Markdown 文本，或点击 `下载 Markdown` 保存文件
+5. 点击 `复制` 直接获取 Markdown 文本，或点击 `下载` 保存文件
 
 工具栏里的扩展弹窗仍然保留，作为备用入口。
 
@@ -247,7 +245,7 @@ Best for:
 #### Option 1: Download from GitHub Releases
 
 1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. Download `x-markdown-exporter-v1.6.0.zip`
+2. Download `x-markdown-exporter-v1.6.1.zip`
 3. Extract the ZIP file
 4. Open the extensions page
    Chrome: `chrome://extensions/`
@@ -270,7 +268,7 @@ Then load the repository folder as an unpacked extension.
 2. Find the floating launcher on the right side
 3. Drag it away if it overlaps the content
 4. Open the panel and choose an export mode
-5. Click `Copy` for Markdown text, or `Download Markdown` to save a file
+5. Click `Copy` for Markdown text, or `Download` to save a file
 
 The toolbar popup is still available as a fallback entry point.
 

@@ -36,7 +36,7 @@
     unsupportedProfile: '主页暂不直接导出；请打开一条推文详情页或 Note 页面',
     unsupportedOther: '当前页面暂不支持导出；请打开 X 推文详情页或 Note 页面',
     note: '默认会附带作者和时间。',
-    download: '下载 Markdown',
+    download: '下载',
     processing: '处理中...',
     refresh: '刷新',
     refreshLoading: '正在刷新页面...',

@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.1
+
+### 中文
+
+- 将主操作按钮文案从“下载 Markdown”缩短为“下载”，改善悬浮面板和弹窗中的按钮排版。
+
+### English
+
+- Shortened the primary action label from "Download Markdown" to "Download" to improve button fit in the floating panel and popup.
+
 ## v1.6.0
 
 ### 中文
