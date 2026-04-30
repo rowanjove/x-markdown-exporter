@@ -188,8 +188,8 @@
 
   // Download modes
 
-  function downloadAsLink(titleText, textData, author, time, stats, threadTweets, options) {
-    const md = composeMarkdown(
+  function buildMarkdownAsLink(titleText, textData, author, time, stats, threadTweets, options) {
+    return composeMarkdown(
       titleText,
       textData,
       author,
@@ -199,6 +199,10 @@
       options,
       (url) => url
     );
+  }
+
+  function downloadAsLink(titleText, textData, author, time, stats, threadTweets, options) {
+    const md = buildMarkdownAsLink(titleText, textData, author, time, stats, threadTweets, options);
     triggerDownloadFile(md, core.makeFilename(titleText, author, options.isArticle) + '.md');
   }
 
@@ -325,6 +329,7 @@
     buildMetadata,
     buildComments,
     finalizeMarkdown,
+    buildMarkdownAsLink,
     downloadAsLink,
     downloadAsEmbed,
     downloadAsZip,

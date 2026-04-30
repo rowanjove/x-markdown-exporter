@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "X Markdown Exporter",
-  "version": "1.5.0",
-  "description": "Export X (Twitter) posts and notes to Markdown with a draggable floating panel and link card support.",
+  "version": "1.6.0",
+  "description": "Copy and archive X (Twitter) posts, threads, and notes as Markdown for AI tools and local knowledge workflows.",
   "permissions": [
     "activeTab",
     "storage"

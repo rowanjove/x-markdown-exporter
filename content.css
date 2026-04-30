@@ -240,6 +240,7 @@
 
 #xpd-floating-root .xpd-status {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-height: 38px;
@@ -251,12 +252,30 @@
   line-height: 1.45;
 }
 
+#xpd-floating-root .xpd-status [data-role="statusText"] {
+  min-width: 0;
+  flex: 1;
+}
+
 #xpd-floating-root .xpd-status__dot {
   width: 7px;
   height: 7px;
   border-radius: 999px;
   background: currentColor;
   flex-shrink: 0;
+}
+
+#xpd-floating-root .xpd-status__type {
+  flex-shrink: 0;
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 #xpd-floating-root .xpd-status--ok {
@@ -364,7 +383,7 @@
 
 #xpd-floating-root .xpd-actions {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
   margin-top: 14px;
 }

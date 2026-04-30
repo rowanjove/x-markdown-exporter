@@ -29,7 +29,12 @@
     checking: '检测中...',
     ready: '可以下载当前内容',
     unsupported: '请打开 X 推文详情页或 Note 页面',
-    notReady: '页面还没准备好，请稍后再试',
+    notReady: '正在等待推文内容加载；如果一直不动，请刷新页面或重新打开详情页',
+    unsupportedTimeline: '时间线暂不直接导出；请点开某条推文详情页后再下载或复制',
+    unsupportedExplore: '探索页暂不直接导出；请打开一条推文详情页或 Note 页面',
+    unsupportedSearch: '搜索页暂不直接导出；请打开搜索结果里的某条推文详情页',
+    unsupportedProfile: '主页暂不直接导出；请打开一条推文详情页或 Note 页面',
+    unsupportedOther: '当前页面暂不支持导出；请打开 X 推文详情页或 Note 页面',
     note: '默认会附带作者和时间。',
     download: '下载 Markdown',
     processing: '处理中...',
@@ -38,7 +43,27 @@
     progressDefault: '正在提取内容...',
     downloadSuccess: '下载成功',
     downloadFailed: '下载失败',
+    copy: '复制',
+    copySuccess: '已复制 Markdown',
+    copyFailed: '复制失败',
     close: '关闭',
+  });
+
+  const PAGE_KIND_LABELS = Object.freeze({
+    article: '文章',
+    tweet: '推文',
+    timeline: '时间线',
+    explore: '探索',
+    search: '搜索',
+    profile: '主页',
+    other: '其他',
+  });
+
+  const CONTENT_TAG_LABELS = Object.freeze({
+    thread: '线程',
+    images: '图',
+    quote: '引用',
+    card: '外链',
   });
 
   const FLOATING_TOP_STORAGE_KEY = 'xpd_float_top';
@@ -56,8 +81,10 @@
     panel: null,
     status: null,
     statusText: null,
+    statusKind: null,
     modeDesc: null,
     downloadBtn: null,
+    copyBtn: null,
     refreshBtn: null,
     closeBtn: null,
     progress: null,
@@ -117,8 +144,10 @@
     uiState.panel = root.querySelector('[data-role="panel"]');
     uiState.status = root.querySelector('[data-role="status"]');
     uiState.statusText = root.querySelector('[data-role="statusText"]');
+    uiState.statusKind = root.querySelector('[data-role="statusKind"]');
     uiState.modeDesc = root.querySelector('[data-role="modeDesc"]');
     uiState.downloadBtn = root.querySelector('[data-role="downloadBtn"]');
+    uiState.copyBtn = root.querySelector('[data-role="copyBtn"]');
     uiState.refreshBtn = root.querySelector('[data-role="refreshBtn"]');
     uiState.closeBtn = root.querySelector('[data-role="closeBtn"]');
     uiState.progress = root.querySelector('[data-role="progress"]');
@@ -137,6 +166,7 @@
     uiState.closeBtn.addEventListener('click', () => setPanelOpen(false));
     uiState.refreshBtn.addEventListener('click', handleRefreshClick);
     uiState.downloadBtn.addEventListener('click', handleFloatingDownload);
+    uiState.copyBtn.addEventListener('click', handleFloatingCopy);
 
     root.querySelectorAll('[data-mode]').forEach((button) => {
       button.addEventListener('click', () => updateModeUi(button.dataset.mode));
@@ -228,6 +258,7 @@
           <div class="xpd-status xpd-status--loading" data-role="status">
             <span class="xpd-status__dot"></span>
             <span data-role="statusText">${h(UI_TEXT.checking)}</span>
+            <span class="xpd-status__type" data-role="statusKind">${h(PAGE_KIND_LABELS.other)}</span>
           </div>
           <div class="xpd-mode-card">
             <div class="xpd-section-title">${h(UI_TEXT.modeTitle)}</div>
@@ -241,6 +272,7 @@
           <div class="xpd-note">${h(UI_TEXT.note)}</div>
           <div class="xpd-actions">
             <button class="xpd-btn xpd-btn--primary" data-role="downloadBtn" type="button">${h(UI_TEXT.download)}</button>
+            <button class="xpd-btn xpd-btn--secondary" data-role="copyBtn" type="button">${h(UI_TEXT.copy)}</button>
             <button class="xpd-btn xpd-btn--secondary" data-role="refreshBtn" type="button">${h(UI_TEXT.refresh)}</button>
           </div>
           <div class="xpd-progress" data-role="progress">
@@ -395,6 +427,36 @@
     }
   }
 
+  async function handleFloatingCopy() {
+    const availability = refreshPanelStatus();
+    if (!availability.ready) {
+      showResult('error', availability.message);
+      showToast('error', availability.message);
+      return;
+    }
+    beginUiWork();
+    try {
+      const response = await _XPD.handleExtractAndCopy(
+        { includeAuthor: true, includeTime: true, includeStats: false, includeComments: false }
+      );
+      if (response?.success) {
+        showResult('success', UI_TEXT.copySuccess);
+        showToast('success', UI_TEXT.copySuccess);
+      } else {
+        const message = response?.error || UI_TEXT.copyFailed;
+        showResult('error', message);
+        showToast('error', message);
+      }
+    } catch (error) {
+      const message = error?.message ? `${UI_TEXT.copyFailed}: ${error.message}` : UI_TEXT.copyFailed;
+      showResult('error', message);
+      showToast('error', message);
+    } finally {
+      endUiWork();
+      refreshPanelStatus();
+    }
+  }
+
   // ── Panel open/close ───────────────────────────────────────────────
 
   function setPanelOpen(nextOpen) {
@@ -432,6 +494,10 @@
     if (uiState.downloadBtn) {
       uiState.downloadBtn.disabled = isBusy || !uiState.ready;
       uiState.downloadBtn.textContent = isBusy ? UI_TEXT.processing : UI_TEXT.download;
+    }
+    if (uiState.copyBtn) {
+      uiState.copyBtn.disabled = isBusy || !uiState.ready;
+      uiState.copyBtn.textContent = UI_TEXT.copy;
     }
     if (uiState.progress) uiState.progress.classList.toggle('xpd-show', isBusy);
     if (uiState.launcher) uiState.launcher.classList.toggle('xpd-busy', isBusy);
@@ -473,23 +539,182 @@
 
   // ── Status management ──────────────────────────────────────────────
 
-  function setStatus(type, text) {
+  function getPageKind() {
+    if (core.detectArticlePage()) return 'article';
+    if (core.POST_DETAIL_URL_RE.test(window.location.href)) return 'tweet';
+    try {
+      const pathname = new URL(window.location.href).pathname.replace(/\/+$/, '') || '/';
+      if (pathname === '/home' || pathname.startsWith('/i/timeline')) return 'timeline';
+      if (pathname === '/explore') return 'explore';
+      if (pathname === '/search') return 'search';
+      if (/^\/(notifications|messages|settings|jobs|compose|i)(\/|$)/i.test(pathname)) {
+        return 'other';
+      }
+      if (/^\/[^/]+$/i.test(pathname)) return 'profile';
+    } catch {
+      // Keep the generic label below.
+    }
+    return 'other';
+  }
+
+  function getUnsupportedMessage(kind) {
+    if (kind === 'timeline') return UI_TEXT.unsupportedTimeline;
+    if (kind === 'explore') return UI_TEXT.unsupportedExplore;
+    if (kind === 'search') return UI_TEXT.unsupportedSearch;
+    if (kind === 'profile') return UI_TEXT.unsupportedProfile;
+    if (kind === 'other') return UI_TEXT.unsupportedOther;
+    return UI_TEXT.unsupported;
+  }
+
+  function getTopLevelTweetArticles(root = document) {
+    return Array.from(root.querySelectorAll('article[data-testid="tweet"]')).filter(
+      (article) => !article.parentElement?.closest('article[data-testid="tweet"]')
+    );
+  }
+
+  function collectTweetMediaImageUrls(root, urls) {
+    if (!(root instanceof Element || root instanceof Document)) return urls;
+    root.querySelectorAll('img[src*="pbs.twimg.com/media"]').forEach((img) => {
+      const src = img.getAttribute('src') || img.src || '';
+      if (!src || src.includes('profile_images') || src.includes('emoji') || src.includes('icon')) {
+        return;
+      }
+      urls.add(core.upgradeImageUrl(src));
+    });
+    return urls;
+  }
+
+  function countTweetMediaImages(root) {
+    return collectTweetMediaImageUrls(root, new Set()).size;
+  }
+
+  function countArticleMediaImages() {
+    const urls = new Set();
+    const containers = document.querySelectorAll(
+      '[data-testid="article-content"], [data-testid="noteContent"], [data-testid="richTextContainer"]'
+    );
+    if (containers.length > 0) {
+      containers.forEach((container) => collectTweetMediaImageUrls(container, urls));
+      return urls.size;
+    }
+    const primaryColumn = document.querySelector('[data-testid="primaryColumn"]');
+    collectTweetMediaImageUrls(primaryColumn || document, urls);
+    return urls.size;
+  }
+
+  function hasQuotedTweet(mainTweetEl) {
+    return Boolean(mainTweetEl?.querySelector('article[data-testid="tweet"]'));
+  }
+
+  function hasPreviewCard(mainTweetEl) {
+    if (!(mainTweetEl instanceof Element)) return false;
+    return Array.from(mainTweetEl.querySelectorAll('a[href], [data-testid*="card"]')).some((el) => {
+      if (el.closest?.('[data-testid="tweetText"]')) return false;
+      if (el.closest?.('[data-testid="User-Name"]')) return false;
+      if (el.closest?.('[role="group"][id]')) return false;
+      if (el.querySelector?.('time')) return false;
+      const isCardMarked = el.getAttribute?.('data-testid')?.toLowerCase().includes('card');
+      const href = el.getAttribute?.('href') || '';
+      const normalizedHref = core.normalizeAnchorUrl(href);
+      if (/\/(status\/\d+|photo\/\d+|video\/\d+)/i.test(normalizedHref)) {
+        return Boolean(isCardMarked);
+      }
+      return (
+        isCardMarked ||
+        href.includes('t.co') ||
+        Boolean(normalizedHref && !/https:\/\/(x\.com|twitter\.com)\//i.test(normalizedHref))
+      );
+    });
+  }
+
+  function countThreadTweets(mainTweetEl) {
+    if (!(mainTweetEl instanceof Element)) return 0;
+    const authorHandle = core.extractAuthorInfo(mainTweetEl).handle;
+    const articles = getTopLevelTweetArticles();
+    const mainIndex = articles.indexOf(mainTweetEl);
+    if (mainIndex < 0) return 0;
+
+    let count = 0;
+    for (let i = mainIndex + 1; i < articles.length; i += 1) {
+      if (core.extractAuthorInfo(articles[i]).handle !== authorHandle) break;
+      count += 1;
+    }
+    return count;
+  }
+
+  function getContentTags(kind, ready) {
+    const labels = [PAGE_KIND_LABELS[kind] || PAGE_KIND_LABELS.other];
+    if (!ready) return labels;
+
+    if (kind === 'tweet') {
+      const mainTweetEl = core.getMainTweet();
+      const threadCount = countThreadTweets(mainTweetEl);
+      const imageCount = countTweetMediaImages(mainTweetEl);
+
+      if (threadCount > 0) labels.push(CONTENT_TAG_LABELS.thread);
+      if (imageCount > 0) labels.push(`${imageCount} ${CONTENT_TAG_LABELS.images}`);
+      if (hasQuotedTweet(mainTweetEl)) labels.push(CONTENT_TAG_LABELS.quote);
+      if (hasPreviewCard(mainTweetEl)) labels.push(CONTENT_TAG_LABELS.card);
+      return labels;
+    }
+
+    if (kind === 'article') {
+      const imageCount = countArticleMediaImages();
+      if (imageCount > 0) labels.push(`${imageCount} ${CONTENT_TAG_LABELS.images}`);
+    }
+
+    return labels;
+  }
+
+  function getContentLabel(kind, ready) {
+    return getContentTags(kind, ready).join(' · ');
+  }
+
+  function setStatus(type, text, kindLabel) {
     if (uiState.status) uiState.status.className = `xpd-status xpd-status--${type}`;
     if (uiState.statusText) uiState.statusText.textContent = text;
+    if (uiState.statusKind) uiState.statusKind.textContent = kindLabel || PAGE_KIND_LABELS.other;
     if (uiState.launcherBadge) uiState.launcherBadge.dataset.state = type;
   }
 
   function evaluatePageAvailability() {
-    if (core.detectArticlePage()) {
-      return { ready: true, loading: false, message: UI_TEXT.ready };
+    const kind = getPageKind();
+    const kindLabel = PAGE_KIND_LABELS[kind] || PAGE_KIND_LABELS.other;
+
+    if (kind === 'article') {
+      return {
+        ready: true,
+        loading: false,
+        kind,
+        kindLabel: getContentLabel(kind, true),
+        message: UI_TEXT.ready,
+      };
     }
-    if (core.POST_DETAIL_URL_RE.test(window.location.href)) {
+    if (kind === 'tweet') {
       if (core.getMainTweet()) {
-        return { ready: true, loading: false, message: UI_TEXT.ready };
+        return {
+          ready: true,
+          loading: false,
+          kind,
+          kindLabel: getContentLabel(kind, true),
+          message: UI_TEXT.ready,
+        };
       }
-      return { ready: false, loading: true, message: UI_TEXT.notReady };
+      return {
+        ready: false,
+        loading: true,
+        kind,
+        kindLabel,
+        message: UI_TEXT.notReady,
+      };
     }
-    return { ready: false, loading: false, message: UI_TEXT.unsupported };
+    return {
+      ready: false,
+      loading: false,
+      kind,
+      kindLabel,
+      message: getUnsupportedMessage(kind),
+    };
   }
 
   function refreshPanelStatus() {
@@ -497,7 +722,8 @@
     uiState.ready = availability.ready;
     setStatus(
       availability.ready ? 'ok' : availability.loading ? 'loading' : 'no',
-      availability.message
+      availability.message,
+      availability.kindLabel
     );
     syncUiControls();
     return availability;
@@ -601,7 +827,8 @@
       if (window.location.href === uiState.lastUrl) return;
       uiState.lastUrl = window.location.href;
       uiState.ready = false;
-      setStatus('loading', UI_TEXT.checking);
+      const kind = getPageKind();
+      setStatus('loading', UI_TEXT.checking, PAGE_KIND_LABELS[kind]);
       syncUiControls();
       clearResult();
       hideToast();

@@ -1,5 +1,7 @@
 const statusEl = document.getElementById('status');
+const statusKindEl = document.getElementById('statusKind');
 const downloadBtn = document.getElementById('downloadBtn');
+const copyBtn = document.getElementById('copyBtn');
 const progressEl = document.getElementById('progress');
 const progressText = document.getElementById('progressText');
 const resultEl = document.getElementById('result');
@@ -15,9 +17,15 @@ const MODE_DESCS = {
   zip: 'Markdown 和图片一起打包成 ZIP，适合完整离线归档。',
 };
 
-function setStatus(type, text) {
+function setStatus(type, text, kindLabel = '其他') {
   statusEl.className = `status ${type}`;
   statusEl.querySelector('span').textContent = text;
+  statusKindEl.textContent = kindLabel;
+}
+
+function setActionDisabled(disabled) {
+  downloadBtn.disabled = disabled;
+  copyBtn.disabled = disabled;
 }
 
 function showResult(type, text) {
@@ -68,23 +76,30 @@ async function checkCurrentPage() {
 
     if (!url.match(/^https:\/\/(x\.com|twitter\.com)\//)) {
       setStatus('no', '请打开 X 推文详情页或 Note 页面');
-      downloadBtn.disabled = true;
+      setActionDisabled(true);
       return;
     }
 
     try {
       const response = await chrome.tabs.sendMessage(currentTabId, { type: 'PING' });
       if (response && response.ok) {
-        setStatus('ok', '可以下载当前内容');
-        downloadBtn.disabled = false;
+        setStatus('ok', '可以下载当前内容', response.kindLabel);
+        setActionDisabled(false);
       } else {
-        setStatus('no', '页面还没准备好，请刷新后重试');
+        setStatus(
+          response?.loading ? 'loading' : 'no',
+          response?.message || '页面还没准备好，请刷新后重试',
+          response?.kindLabel
+        );
+        setActionDisabled(true);
       }
     } catch {
       setStatus('no', '页面还没准备好，请刷新后重试');
+      setActionDisabled(true);
     }
   } catch {
     setStatus('no', '检测失败，请重试');
+    setActionDisabled(true);
   }
 }
 
@@ -102,7 +117,7 @@ refreshBtn.addEventListener('click', () => {
 downloadBtn.addEventListener('click', async () => {
   if (!currentTabId) return;
 
-  downloadBtn.disabled = true;
+  setActionDisabled(true);
   downloadBtn.textContent = '处理中...';
   progressEl.classList.add('show');
   resultEl.className = 'result';
@@ -131,8 +146,44 @@ downloadBtn.addEventListener('click', async () => {
     // Fix #12: friendly error message instead of raw error.message
     showResult('error', '下载失败，请刷新页面后重试');
   } finally {
-    downloadBtn.disabled = false;
+    setActionDisabled(false);
     downloadBtn.textContent = '下载 Markdown';
+    progressEl.classList.remove('show');
+  }
+});
+
+copyBtn.addEventListener('click', async () => {
+  if (!currentTabId) return;
+
+  setActionDisabled(true);
+  copyBtn.textContent = '复制中...';
+  progressEl.classList.add('show');
+  resultEl.className = 'result';
+  resultEl.style.display = 'none';
+
+  try {
+    progressText.textContent = '正在复制 Markdown...';
+
+    const response = await chrome.tabs.sendMessage(currentTabId, {
+      type: 'EXTRACT_AND_COPY',
+      options: {
+        includeAuthor: true,
+        includeTime: true,
+        includeStats: false,
+        includeComments: false,
+      },
+    });
+
+    if (response && response.success) {
+      showResult('success', '已复制 Markdown');
+    } else {
+      showResult('error', response?.error || '复制失败');
+    }
+  } catch {
+    showResult('error', '复制失败，请刷新页面后重试');
+  } finally {
+    setActionDisabled(false);
+    copyBtn.textContent = '复制';
     progressEl.classList.remove('show');
   }
 });

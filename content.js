@@ -38,9 +38,9 @@
     return { ...DEFAULT_EXPORT_OPTIONS, ...(options || {}) };
   }
 
-  // Core extract-and-download orchestrator
+  // Core extraction / action orchestrators
 
-  async function handleExtractAndDownload(options, mode) {
+  async function buildExportPayload(options) {
     const exportOptions = normalizeOptions(options);
     exportOptions.isArticle = core.detectArticlePage();
     exportOptions.sourceUrl = core.getSourceUrl();
@@ -68,7 +68,7 @@
       if (!mainTweetEl) {
         throw new core.ExtractionError(
           'MAIN_TWEET_NOT_FOUND',
-          `未找到当前推文正文。请先打开推文详情页后重试；如果仍然失败，请到 GitHub 提 Issue: ${core.GITHUB_ISSUES_URL}`
+          `未找到当前推文正文。请确认已打开具体推文详情页，并等待内容加载完成；如果一直失败，请刷新页面后重试，或到 GitHub 提 Issue: ${core.GITHUB_ISSUES_URL}`
         );
       }
 
@@ -89,6 +89,42 @@
 
     const titleText = core.deriveTitleText(textData.t);
 
+    return { titleText, textData, author, time, stats, threadTweets, exportOptions };
+  }
+
+  async function writeTextToClipboard(text) {
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return;
+      } catch (error) {
+        console.warn('[XPD] navigator.clipboard failed, falling back:', error.message);
+      }
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-1000px';
+    textarea.style.left = '-1000px';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    try {
+      const copied = document.execCommand('copy');
+      if (!copied) throw new Error('copy command returned false');
+    } finally {
+      textarea.remove();
+    }
+  }
+
+  async function handleExtractAndDownload(options, mode) {
+    const payload = await buildExportPayload(options);
+    const { titleText, textData, author, time, stats, threadTweets, exportOptions } = payload;
+
     if (mode === 'zip') {
       await exp.downloadAsZip(titleText, textData, author, time, stats, threadTweets, exportOptions);
     } else if (mode === 'embed') {
@@ -100,20 +136,54 @@
     return { success: true };
   }
 
-  // Expose so UI module can call it from the floating panel download button.
+  async function handleExtractAndCopy(options) {
+    const payload = await buildExportPayload(options);
+    const { titleText, textData, author, time, stats, threadTweets, exportOptions } = payload;
+    _XPD.sendProgress?.('正在复制 Markdown...');
+    const markdown = exp.buildMarkdownAsLink(
+      titleText,
+      textData,
+      author,
+      time,
+      stats,
+      threadTweets,
+      exportOptions
+    );
+    await writeTextToClipboard(markdown);
+    return { success: true };
+  }
+
+  // Expose so UI module can call actions from the floating panel buttons.
   _XPD.handleExtractAndDownload = handleExtractAndDownload;
+  _XPD.handleExtractAndCopy = handleExtractAndCopy;
 
   // Message listener
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === 'PING') {
-      sendResponse({ ok: ui.evaluatePageAvailability().ready });
+      const availability = ui.evaluatePageAvailability();
+      sendResponse({ ok: availability.ready, ...availability });
       return false;
     }
 
     if (message.type === 'EXTRACT_AND_DOWNLOAD') {
       ui.beginUiWork();
       handleExtractAndDownload(message.options, message.mode)
+        .then((result) => sendResponse(result))
+        .catch((error) => {
+          console.error('[XPD] Error:', error);
+          sendResponse({ success: false, error: error.message });
+        })
+        .finally(() => {
+          ui.endUiWork();
+          ui.refreshPanelStatus();
+        });
+      return true;
+    }
+
+    if (message.type === 'EXTRACT_AND_COPY') {
+      ui.beginUiWork();
+      handleExtractAndCopy(message.options)
         .then((result) => sendResponse(result))
         .catch((error) => {
           console.error('[XPD] Error:', error);

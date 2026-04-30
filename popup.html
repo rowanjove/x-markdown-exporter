@@ -34,6 +34,7 @@
 
     .status {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
       gap: 8px;
       padding: 10px 12px;
@@ -53,6 +54,23 @@
       border-radius: 50%;
       background: currentColor;
       flex-shrink: 0;
+    }
+
+    .status span {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .status-type {
+      flex: 0 0 auto;
+      max-width: 100%;
+      padding: 3px 7px;
+      border-radius: 9999px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: nowrap;
     }
 
     .section-title {
@@ -202,6 +220,7 @@
   <div class="status loading" id="status">
     <div class="status-dot"></div>
     <span>检测中...</span>
+    <b class="status-type" id="statusKind">其他</b>
   </div>
 
   <div class="section-title">下载格式</div>
@@ -218,6 +237,7 @@
 
   <div class="buttons-row">
     <button class="btn btn-primary" id="downloadBtn" disabled>下载 Markdown</button>
+    <button class="btn btn-secondary" id="copyBtn" disabled>复制</button>
     <button class="btn btn-secondary" id="refreshBtn" title="刷新页面">刷新</button>
   </div>
 
@@ -227,7 +247,7 @@
   </div>
   <div class="result" id="result"></div>
 
-  <div class="footer">v1.5.0</div>
+  <div class="footer">v1.6.0</div>
 
   <script src="popup.js"></script>
 </body>

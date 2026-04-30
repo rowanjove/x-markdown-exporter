@@ -4,16 +4,16 @@
 
 [中文](#chinese) | [English](#english)
 
-X Markdown Exporter is a Chrome / Edge extension for exporting X (Twitter) posts, threads, and long-form notes into Markdown.
+X Markdown Exporter is a Chrome / Edge extension for copying and archiving X (Twitter) posts, threads, and long-form notes as Markdown for AI tools and local knowledge workflows.
 
 ## Latest Update
 
-### v1.5.0
+### v1.6.0
 
-- Detect empty DOM extractions and show actionable failure messages with a GitHub issue link
-- Add `source_url` metadata to every export
-- Warn before oversized `embed` exports and offer an automatic fallback to ZIP
-- Reuse already-processed images when `embed` switches to ZIP packaging
+- Add one-click Markdown copy for feeding posts, threads, and Notes into OpenClaw, Claude Code, and similar tools
+- Show richer content labels such as post, article, thread, image count, quoted post, and link-card hints
+- Add clearer guidance for timeline, search, profile, explore, and still-loading pages
+- Refresh the README around AI-context handoff and local archiving workflows
 
 ## Preview
 
@@ -27,19 +27,31 @@ X Markdown Exporter is a Chrome / Edge extension for exporting X (Twitter) posts
 
 ### 这是什么
 
-这是一个把 X / Twitter 推文、线程和 Note 导出成 Markdown 的浏览器扩展。新版默认在页面右侧提供可拖动的悬浮按钮，点开后即可选择导出模式，不需要把插件固定在工具栏里。
+这是一个把 X / Twitter 推文、线程和 Note 转成 Markdown 的浏览器扩展。它的核心定位很直接：当你想把一些推特内容喂给 OpenClaw、Claude Code、Claude、ChatGPT 等工具时，不必和网页反爬、复制断行、图片链接丢失这些细碎问题纠缠，直接复制一份结构清晰的 Markdown 就能作为上下文使用。
+
+它也适合本地归档。很多长文、线程和高质量推文值得保存到 Obsidian、Notion、本地知识库或项目资料夹里，X Markdown Exporter 可以把正文、图片、引用推文、外链卡片和来源信息尽量整理成更耐用的 Markdown。
 
 ### 亮点
 
 - 支持 X / Twitter 推文详情页和 Note 页面导出
 - 页面内右侧悬浮按钮，支持横向和纵向拖动，自动记住位置
 - 点击后弹出小面板，直接选择导出模式
+- 一键复制 Markdown 文本，适合快速投喂给 OpenClaw、Claude Code 等工具
+- 可在面板状态旁显示推文、文章、线程、图片数量、引用推文和外链卡片等内容标签
 - 保留正文和图片的原始顺序
 - 支持同作者线程连续导出
 - 支持外链预览卡提取，导出时会尽量保留链接标题、摘要和域名
 - 支持三种导出模式
 - 默认附带作者和发布时间
+- 时间线、搜索页、主页等不支持直接导出的页面会给出更明确的下一步提示
 - 所有处理都在本地浏览器完成，不依赖后端服务
+
+### 典型场景
+
+- 把一条推文、一个线程或一篇 Note 复制成 Markdown，直接粘贴给 OpenClaw、Claude Code 或其他 AI 编程/研究工具分析
+- 绕过网页端反爬和复制体验限制，把 X 内容稳定地转成文本上下文
+- 把高质量文章、教程、观点线程保存到 Obsidian、Notion、Logseq 或本地资料夹
+- 将带图片、引用推文和外链卡片的内容整理成更适合二次阅读和检索的 Markdown
 
 ### 导出模式
 
@@ -49,6 +61,8 @@ Markdown 中保留远程图片地址，并尽量把链接卡片转成普通 Mark
 
 适合：
 
+- 点击 `复制` 时的默认文本形态
+- 快速投喂给 AI 工具
 - 文件体积最小
 - 在线阅读或二次整理
 
@@ -75,7 +89,7 @@ Markdown 和图片分开保存，再打包成 ZIP。
 #### 方式一：从 GitHub Releases 下载
 
 1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. 下载最新版本里的 `x-markdown-exporter-v1.5.0.zip`
+2. 下载最新版本里的 `x-markdown-exporter-v1.6.0.zip`
 3. 解压 ZIP 文件
 4. 打开扩展管理页
    Chrome: `chrome://extensions/`
@@ -98,7 +112,7 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 2. 在页面右侧找到悬浮按钮
 3. 如果挡住内容，可以直接拖到更合适的位置
 4. 点开面板后选择导出模式
-5. 点击 `下载 Markdown`
+5. 点击 `复制` 直接获取 Markdown 文本，或点击 `下载 Markdown` 保存文件
 
 工具栏里的扩展弹窗仍然保留，作为备用入口。
 
@@ -143,7 +157,7 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 
 ### 已知限制
 
-- 主要面向推文详情页和 Note 页面，时间线首页不会直接导出
+- 主要面向推文详情页和 Note 页面，时间线、搜索页和主页不会直接导出；请先点开具体推文或 Note
 - 如果 X 调整 DOM 结构，提取规则可能需要跟进
 - 大多数外链预览卡可以提取，但极个别复杂卡片仍可能不完整
 
@@ -170,20 +184,32 @@ git clone https://github.com/Renn9527/x-markdown-exporter.git
 
 ### What It Does
 
-X Markdown Exporter exports X / Twitter posts, threads, and long-form notes into Markdown. The latest UI uses a draggable floating button on the right side of the page, so you can open the export panel directly inside X without pinning the extension in the browser toolbar.
+X Markdown Exporter turns X / Twitter posts, threads, and long-form Notes into Markdown. Its main job is practical: when you need to feed Twitter/X content into OpenClaw, Claude Code, Claude, ChatGPT, or another coding and research tool, you can copy clean Markdown directly instead of fighting page anti-scraping behavior, broken selection, or messy formatting.
+
+It is also useful for archiving. Good posts, threads, and long-form Notes often deserve a durable local copy. X Markdown Exporter keeps the text, images, quoted posts, link cards, and source metadata in a format that works well in Obsidian, Notion, local folders, and knowledge-base workflows.
 
 ### Highlights
 
 - Export X / Twitter post detail pages and Note pages
 - Draggable in-page floating launcher with saved position
 - Open a compact export panel directly on the page
+- Copy Markdown text with one click for fast AI-context handoff to OpenClaw, Claude Code, and similar tools
+- Show content labels for posts, articles, threads, image counts, quoted posts, and link cards
 - Preserve the original order of text and images
 - Export same-author thread continuations
 - Convert supported link preview cards into Markdown links with title / summary / domain
 - Support `link`, `embed`, and `zip` output modes
 - Include author, publish time, and `source_url` by default
 - Guard oversized `embed` exports by offering a ZIP fallback
+- Give clearer next-step guidance on timeline, search, profile, explore, and still-loading pages
 - Run fully in the browser with no backend service
+
+### Common Workflows
+
+- Copy a post, thread, or Note as Markdown and paste it into OpenClaw, Claude Code, or another AI coding/research tool
+- Turn X content into stable text context without relying on brittle page scraping or manual selection
+- Archive high-quality articles, tutorials, and opinion threads into Obsidian, Notion, Logseq, or local folders
+- Preserve content with images, quoted posts, and external link cards in a cleaner Markdown shape for later reading and search
 
 ### Export Modes
 
@@ -193,6 +219,8 @@ Keep remote image URLs in Markdown and preserve supported external preview cards
 
 Best for:
 
+- the default text shape used by `Copy`
+- quickly feeding AI tools
 - the smallest file size
 - online reading or lightweight notes
 
@@ -219,7 +247,7 @@ Best for:
 #### Option 1: Download from GitHub Releases
 
 1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
-2. Download `x-markdown-exporter-v1.5.0.zip`
+2. Download `x-markdown-exporter-v1.6.0.zip`
 3. Extract the ZIP file
 4. Open the extensions page
    Chrome: `chrome://extensions/`
@@ -242,7 +270,7 @@ Then load the repository folder as an unpacked extension.
 2. Find the floating launcher on the right side
 3. Drag it away if it overlaps the content
 4. Open the panel and choose an export mode
-5. Click `Download Markdown`
+5. Click `Copy` for Markdown text, or `Download Markdown` to save a file
 
 The toolbar popup is still available as a fallback entry point.
 
@@ -287,7 +315,7 @@ The toolbar popup is still available as a fallback entry point.
 
 ### Known Limitations
 
-- The extension is designed for post detail pages and Note pages, not the main timeline feed
+- The extension is designed for post detail pages and Note pages. Timeline, search, and profile pages are guidance-only entry points; open a specific post or Note before exporting
 - If X changes its DOM structure significantly, the extraction rules may need updates, but empty exports now fail with a clearer warning instead of silently saving a blank file
 - Most preview cards are handled, but a few complex cards may still be incomplete
 
