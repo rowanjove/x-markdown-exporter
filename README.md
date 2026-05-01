@@ -6,6 +6,8 @@
 
 X Markdown Exporter is a Chrome / Edge extension for copying and archiving X (Twitter) posts, threads, and long-form notes as Markdown for AI tools and local knowledge workflows.
 
+[Chrome Web Store](https://chromewebstore.google.com/detail/x-markdown-exporter/alicknocngkldhijfocddaepnfpgjlee) | [GitHub Releases](https://github.com/rowanjove/x-markdown-exporter/releases)
+
 ## Latest Update
 
 ### v1.6.1
@@ -84,9 +86,15 @@ Markdown 和图片分开保存，再打包成 ZIP。
 
 ### 安装
 
-#### 方式一：从 GitHub Releases 下载
+#### 方式一：从 Chrome 网上应用店安装
 
-1. 打开 [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
+1. 打开 [X Markdown Exporter - Chrome 网上应用店](https://chromewebstore.google.com/detail/x-markdown-exporter/alicknocngkldhijfocddaepnfpgjlee)
+2. 点击 `添加至 Chrome`
+3. 按浏览器提示确认安装
+
+#### 方式二：从 GitHub Releases 下载
+
+1. 打开 [Releases](https://github.com/rowanjove/x-markdown-exporter/releases)
 2. 下载最新版本里的 `x-markdown-exporter-v1.6.1.zip`
 3. 解压 ZIP 文件
 4. 打开扩展管理页
@@ -96,10 +104,10 @@ Markdown 和图片分开保存，再打包成 ZIP。
 6. 点击“加载已解压的扩展程序”
 7. 选择解压后的目录
 
-#### 方式二：直接克隆仓库
+#### 方式三：直接克隆仓库
 
 ```bash
-git clone https://github.com/Renn9527/x-markdown-exporter.git
+git clone https://github.com/rowanjove/x-markdown-exporter.git
 ```
 
 然后同样在浏览器扩展管理页加载仓库目录。
@@ -242,9 +250,15 @@ Best for:
 
 ### Installation
 
-#### Option 1: Download from GitHub Releases
+#### Option 1: Install from the Chrome Web Store
 
-1. Open [Releases](https://github.com/Renn9527/x-markdown-exporter/releases)
+1. Open [X Markdown Exporter on the Chrome Web Store](https://chromewebstore.google.com/detail/x-markdown-exporter/alicknocngkldhijfocddaepnfpgjlee)
+2. Click `Add to Chrome`
+3. Confirm the browser prompt
+
+#### Option 2: Download from GitHub Releases
+
+1. Open [Releases](https://github.com/rowanjove/x-markdown-exporter/releases)
 2. Download `x-markdown-exporter-v1.6.1.zip`
 3. Extract the ZIP file
 4. Open the extensions page
@@ -254,10 +268,10 @@ Best for:
 6. Click `Load unpacked`
 7. Select the extracted folder
 
-#### Option 2: Clone the Repository
+#### Option 3: Clone the Repository
 
 ```bash
-git clone https://github.com/Renn9527/x-markdown-exporter.git
+git clone https://github.com/rowanjove/x-markdown-exporter.git
 ```
 
 Then load the repository folder as an unpacked extension.
